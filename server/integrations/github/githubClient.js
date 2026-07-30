@@ -1,3 +1,35 @@
+function createVaultError(message, status, code) {
+  const error = new Error(message);
+  error.status = status;
+  error.code = code;
+  error.expose = true;
+  return error;
+}
+
+function decodeContent(body) {
+  if (!body || typeof body.content !== 'string') {
+    throw createVaultError(
+      'GitHub Vault returned an invalid response',
+      502,
+      'VAULT_UPSTREAM_ERROR'
+    );
+  }
+
+  const content = body.content.replace(/\s/g, '');
+  const isValidBase64 = content.length === 0
+    || (content.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(content));
+
+  if (!isValidBase64) {
+    throw createVaultError(
+      'GitHub Vault returned invalid file content',
+      502,
+      'VAULT_UPSTREAM_ERROR'
+    );
+  }
+
+  return Buffer.from(content, 'base64').toString('utf8');
+}
+
 export class GitHubClient {
   constructor({ token, owner, repo, branch, fetchImpl = fetch }) {
     this.token = token;
@@ -13,36 +45,50 @@ export class GitHubClient {
 
   async readText(path) {
     if (!this.isConfigured()) {
-      const error = new Error('GitHub Vault is not configured');
-      error.status = 503;
-      error.code = 'VAULT_NOT_CONFIGURED';
-      throw error;
+      throw createVaultError(
+        'GitHub Vault is not configured',
+        503,
+        'VAULT_NOT_CONFIGURED'
+      );
     }
 
-    const url = `https://api.github.com/repos/${this.owner}/${this.repo}/contents/${path}?ref=${encodeURIComponent(this.branch)}`;
-    const response = await this.fetch(url, {
-      headers: {
-        Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${this.token}`,
-        'X-GitHub-Api-Version': '2022-11-28'
+    try {
+      const url = `https://api.github.com/repos/${this.owner}/${this.repo}/contents/${path}?ref=${encodeURIComponent(this.branch)}`;
+      const response = await this.fetch(url, {
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${this.token}`,
+          'X-GitHub-Api-Version': '2022-11-28'
+        }
+      });
+
+      if (response.status === 404) {
+        throw createVaultError(
+          `Vault file not found: ${path}`,
+          404,
+          'VAULT_FILE_NOT_FOUND'
+        );
       }
-    });
 
-    if (response.status === 404) {
-      const error = new Error(`Vault file not found: ${path}`);
-      error.status = 404;
-      error.code = 'VAULT_FILE_NOT_FOUND';
-      throw error;
+      if (!response.ok) {
+        throw createVaultError(
+          'GitHub Vault request failed',
+          502,
+          'VAULT_UPSTREAM_ERROR'
+        );
+      }
+
+      return decodeContent(await response.json());
+    } catch (error) {
+      if (error?.code?.startsWith('VAULT_')) {
+        throw error;
+      }
+
+      throw createVaultError(
+        'GitHub Vault request failed',
+        502,
+        'VAULT_UPSTREAM_ERROR'
+      );
     }
-
-    if (!response.ok) {
-      const error = new Error('GitHub Vault request failed');
-      error.status = 502;
-      error.code = 'VAULT_UPSTREAM_ERROR';
-      throw error;
-    }
-
-    const body = await response.json();
-    return Buffer.from(body.content, 'base64').toString('utf8');
   }
 }
