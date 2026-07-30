@@ -1,23 +1,31 @@
 import React, { useEffect, useState } from 'react';
+import { resolveProjectsState } from './lib/projectsState.js';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000/api/v1';
 
+const EMPTY_MESSAGE = {
+  'missing-registry': 'The Vault is connected, but it has no registry/PROJECTS.md yet. Add that file to list projects.',
+  'no-projects': 'No projects are registered yet. Add a row to registry/PROJECTS.md to list one.'
+};
+
 export default function App() {
-  const [projects, setProjects] = useState([]);
-  const [status, setStatus] = useState('loading');
+  const [{ status, projects, reason }, setState] = useState({ status: 'loading', projects: [] });
 
   useEffect(() => {
+    let active = true;
+
     fetch(`${API_BASE_URL}/projects`)
-      .then(async (response) => {
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload?.error?.message ?? 'Unable to load projects');
-        return payload.data.projects;
+      .then(async (response) => ({ ok: response.ok, payload: await response.json() }))
+      .then((result) => {
+        if (active) setState(resolveProjectsState(result));
       })
-      .then((items) => {
-        setProjects(items);
-        setStatus('ready');
-      })
-      .catch(() => setStatus('unavailable'));
+      .catch(() => {
+        if (active) setState({ status: 'error', projects: [] });
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   return (
@@ -30,10 +38,19 @@ export default function App() {
       <section>
         <h2>Vault projects</h2>
         {status === 'loading' && <p>Loading projects…</p>}
-        {status === 'unavailable' && <p>The Vault is not configured yet. Add GitHub environment variables to connect it.</p>}
-        {status === 'ready' && (projects.length ? (
-          <ul>{projects.map((project) => <li key={project.slug}><strong>{project.name}</strong><span>{project.summary || 'No summary documented'}</span></li>)}</ul>
-        ) : <p>No projects are registered yet.</p>)}
+        {status === 'unconfigured' && <p>The Vault is not configured yet. Add GitHub environment variables to connect it.</p>}
+        {status === 'empty' && <p>{EMPTY_MESSAGE[reason] ?? EMPTY_MESSAGE['no-projects']}</p>}
+        {status === 'error' && <p>Projects could not be loaded. Check that the API is running and try again.</p>}
+        {status === 'ready' && (
+          <ul>
+            {projects.map((project) => (
+              <li key={project.slug}>
+                <strong>{project.name}</strong>
+                <span>{project.summary || 'No summary documented'}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </main>
   );
