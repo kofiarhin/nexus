@@ -1,0 +1,30 @@
+{
+  "name": "nexus",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:client": "vite --config client/vite.config.js",
+    "dev:server": "node --watch server/server.js",
+    "build": "npm run build:client",
+    "build:client": "vite build --config client/vite.config.js",
+    "preview": "vite preview --config client/vite.config.js",
+    "start": "node server/server.js",
+    "test": "vitest run",
+    "lint": "node scripts/lint.mjs"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^5.2.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "supertest": "^7.1.4",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10"
+  }
+}
