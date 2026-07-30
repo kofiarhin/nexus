@@ -1,9 +1,7 @@
 /**
- * Maps an API response for GET /projects onto the view states required by the
- * specification: dashboard, empty, and configuration error.
- *
- * A configured Vault that has no registry file yet is an empty Vault, not a
- * configuration error, so the two must not collapse into one message.
+ * Maps an API response for GET /projects onto explicit view states.
+ * Configuration, missing-registry, upstream, and unexpected failures stay
+ * separate so the UI does not give misleading recovery instructions.
  */
 export function resolveProjectsState({ ok, payload } = {}) {
   const code = payload?.error?.code;
@@ -14,6 +12,10 @@ export function resolveProjectsState({ ok, payload } = {}) {
 
   if (code === 'VAULT_FILE_NOT_FOUND') {
     return { status: 'empty', projects: [], reason: 'missing-registry' };
+  }
+
+  if (code === 'VAULT_UPSTREAM_ERROR') {
+    return { status: 'upstream-error', projects: [] };
   }
 
   if (!ok || payload?.success !== true) {
