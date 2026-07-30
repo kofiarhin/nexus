@@ -10,14 +10,16 @@ write operations, and AI requests are deferred to later milestones.
 ## Requirements
 
 - Node.js 22.12 or newer
+- npm with access to the public npm registry
 
 ## Setup
 
 ```bash
-npm install
+npm ci
 cp .env.example .env
 ```
 
+Use `npm install` only when intentionally changing dependencies and regenerating `package-lock.json`.
 Populate `GITHUB_TOKEN` and `GITHUB_OWNER` to connect a Vault. Without them the API still runs and
 returns a controlled `VAULT_NOT_CONFIGURED` response from Vault-backed routes.
 
@@ -29,6 +31,7 @@ returns a controlled `VAULT_NOT_CONFIGURED` response from Vault-backed routes.
 | `npm run dev:client` | Run the client only, on port 5173 |
 | `npm run dev:server` | Run the API only, with file watching |
 | `npm run build` | Build the client to `dist/client` |
+| `npm run build:client` | Build the client to `dist/client` |
 | `npm start` | Start the API for production |
 | `npm test` | Run the Vitest suite |
 | `npm run lint` | Syntax-check server, test, and script files |
@@ -69,6 +72,13 @@ Successful responses use `{ "success": true, "data": {}, "requestId": "uuid" }`.
 `{ "success": false, "error": { "code": "...", "message": "..." }, "requestId": "uuid" }`. Every
 response carries an `x-request-id` header, preserving a supplied ID when one is sent.
 
+Expected Vault failures are normalized as:
+
+- `VAULT_NOT_CONFIGURED` with HTTP 503
+- `VAULT_FILE_NOT_FOUND` with HTTP 404
+- `VAULT_UPSTREAM_ERROR` with HTTP 502
+- malformed JSON request bodies as `INVALID_JSON` with HTTP 400
+
 ## Vault format
 
 `GET /projects` parses Markdown table rows whose first cell is a project link:
@@ -78,6 +88,26 @@ response carries an `x-request-id` header, preserving a supplied ID when one is 
 ```
 
 Rows without a link in the first cell are ignored, and registry order is preserved.
+
+## Verification
+
+Run the complete Foundation verification suite from the repository root:
+
+```bash
+npm ci
+npm test
+npm run lint
+npm run build:client
+```
+
+Start the API with `npm start`, then smoke-test:
+
+```text
+GET /api/v1/health
+GET /api/v1/health/vault
+GET /api/v1/projects
+GET /api/v1/unknown
+```
 
 ## Deployment
 
