@@ -40,6 +40,7 @@ export default function App() {
         {status === 'loading' && <p>Loading projects…</p>}
         {status === 'unconfigured' && <p>The Vault is not configured yet. Add GitHub environment variables to connect it.</p>}
         {status === 'empty' && <p>{EMPTY_MESSAGE[reason] ?? EMPTY_MESSAGE['no-projects']}</p>}
+        {status === 'upstream-error' && <p>The Vault is temporarily unavailable. Try again shortly.</p>}
         {status === 'error' && <p>Projects could not be loaded. Check that the API is running and try again.</p>}
         {status === 'ready' && (
           <ul>
