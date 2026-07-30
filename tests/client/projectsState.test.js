@@ -40,8 +40,11 @@ describe('resolveProjectsState', () => {
     });
   });
 
-  it('reports upstream and unknown failures as errors', () => {
-    expect(resolveProjectsState(failure('VAULT_UPSTREAM_ERROR')).status).toBe('error');
+  it('reports upstream failures separately from unexpected errors', () => {
+    expect(resolveProjectsState(failure('VAULT_UPSTREAM_ERROR'))).toEqual({
+      status: 'upstream-error',
+      projects: []
+    });
     expect(resolveProjectsState(failure('INTERNAL_ERROR')).status).toBe('error');
   });
 
