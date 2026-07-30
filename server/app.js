@@ -24,9 +24,10 @@ export function createApp({ environment = process.env, fetchImpl = fetch } = {})
   const app = express();
 
   app.disable('x-powered-by');
+  // Runs first so preflight and parser-rejected requests still carry a request ID.
+  app.use(requestId);
   app.use(cors({ origin: env.clientUrl }));
   app.use(express.json({ limit: '1mb' }));
-  app.use(requestId);
   app.use('/api/v1', createApiRouter({
     healthController: createHealthController({ githubClient }),
     projectController: createProjectController({ projectService })
