@@ -5,11 +5,12 @@ import { ErrorState, Loading } from '../components/States.jsx';
 import { useSettings } from '../lib/queries.js';
 
 const yesNo = (value) => (value ? <Badge tone="success">enabled</Badge> : <Badge tone="neutral">disabled</Badge>);
+const fallback = 'not set';
 
 export default function Settings() {
   const settings = useSettings();
 
-  if (settings.isPending) return <Loading label="Loading settings…" />;
+  if (settings.isPending) return <Loading label="Loading settings..." />;
   if (settings.isError) return <ErrorState error={settings.error} onRetry={settings.refetch} />;
 
   const data = settings.data;
@@ -21,33 +22,10 @@ export default function Settings() {
         description="Configuration is read-only here. Values are set through server environment variables; secrets are never returned."
       />
 
-      <Card title="Authentication">
-        <dl className="definition-grid">
-          <dt>Authentication</dt>
-          <dd>{yesNo(data.authentication.authEnabled)}</dd>
-          <dt>Owner credentials</dt>
-          <dd>
-            {data.authentication.authConfigured ? (
-              <Badge tone="success">configured</Badge>
-            ) : (
-              <Badge tone="warning">not configured</Badge>
-            )}
-          </dd>
-          <dt>Owner</dt>
-          <dd>{data.authentication.owner?.email ?? '—'}</dd>
-        </dl>
-        {!data.authentication.authConfigured && (
-          <p className="notice">
-            Set <code>OWNER_EMAIL</code> and <code>OWNER_PASSWORD_HASH</code>. Generate the hash with{' '}
-            <code>npm run auth:hash</code>. Writes stay disabled until owner sign-in is configured.
-          </p>
-        )}
-      </Card>
-
       <Card title="Vault">
         <dl className="definition-grid">
           <dt>Repository</dt>
-          <dd>{data.vault.repository ?? '—'}</dd>
+          <dd>{data.vault.repository ?? fallback}</dd>
           <dt>Branch</dt>
           <dd>{data.vault.branch}</dd>
           <dt>Connection</dt>
@@ -62,7 +40,7 @@ export default function Settings() {
           </dd>
         </dl>
         <p className="notice notice-warning">
-          Keep the Vault repository private before storing personal, client, financial, or operational records.
+          MVP endpoints are public. Keep the API and Vault repository private before storing personal, client, financial, or operational records.
         </p>
       </Card>
 
@@ -73,7 +51,7 @@ export default function Settings() {
           <dt>Status</dt>
           <dd>{data.reasoning.configured ? <Badge tone="success">configured</Badge> : <Badge tone="warning">not configured</Badge>}</dd>
           <dt>Model</dt>
-          <dd>{data.reasoning.model ?? '—'}</dd>
+          <dd>{data.reasoning.model ?? fallback}</dd>
           <dt>Timeout</dt>
           <dd>{data.reasoning.timeoutMs} ms</dd>
         </dl>
@@ -102,12 +80,6 @@ export default function Settings() {
             )}
           </dd>
         </dl>
-        {data.operations.writeOperationsRequested && !data.operations.writeOperationsEnabled && (
-          <p className="notice notice-warning">
-            <code>WRITE_OPERATIONS_ENABLED</code> is set, but writes remain disabled because owner authentication is
-            not configured. Mutations are never reachable without an authenticated owner.
-          </p>
-        )}
       </Card>
 
       <Card title="Retrieval limits">

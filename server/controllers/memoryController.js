@@ -11,7 +11,7 @@ export function createMemoryController({ memoryService }) {
     propose: asyncHandler(async (req, res) => {
       const proposal = await memoryService.propose({
         ...res.locals.body,
-        actor: res.locals.principal
+        actor: null
       });
       return created(res, { proposal });
     }),

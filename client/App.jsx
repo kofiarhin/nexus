@@ -2,8 +2,7 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Router, Routes, useLocation, useNavigate } from './lib/router.jsx';
 import { Layout } from './components/Layout.jsx';
-import { Empty, ErrorState, Loading } from './components/States.jsx';
-import { useAuthStatus } from './lib/queries.js';
+import { Empty } from './components/States.jsx';
 
 import Today from './pages/Today.jsx';
 import Chat from './pages/Chat.jsx';
@@ -18,7 +17,6 @@ import Daily from './pages/Daily.jsx';
 import Reports from './pages/Reports.jsx';
 import Activity from './pages/Activity.jsx';
 import Settings from './pages/Settings.jsx';
-import Login from './pages/Login.jsx';
 
 const ROUTES = [
   { path: '/today', element: Today },
@@ -48,36 +46,13 @@ function NotFound() {
   );
 }
 
-/**
- * Authentication gate.
- *
- * The sign-in screen renders instead of the workspace whenever authentication
- * is enabled and no session is active, so no private view is ever painted for
- * an unauthenticated request.
- */
 function Workspace() {
-  const status = useAuthStatus();
   const location = useLocation();
   const navigate = useNavigate();
 
   React.useEffect(() => {
     if (location.pathname === '/' || location.pathname === '') navigate('/today', { replace: true });
   }, [location.pathname, navigate]);
-
-  if (status.isPending) return <Loading label="Starting Nexus…" />;
-  if (status.isError) {
-    return (
-      <main className="auth-screen">
-        <div className="auth-card">
-          <h1>Nexus</h1>
-          <ErrorState error={status.error} onRetry={status.refetch} />
-        </div>
-      </main>
-    );
-  }
-
-  const requiresLogin = status.data.authEnabled && !status.data.authenticated;
-  if (requiresLogin) return <Login authStatus={status.data} />;
 
   return (
     <Layout>
@@ -91,7 +66,7 @@ export function createQueryClient() {
     defaultOptions: {
       queries: {
         retry: (failureCount, error) => {
-          // Authorization, validation, and conflict failures are not transient.
+          // Validation, policy, and conflict failures are not transient.
           if (error?.code && error.code !== 'NETWORK_ERROR') return false;
           return failureCount < 2;
         },

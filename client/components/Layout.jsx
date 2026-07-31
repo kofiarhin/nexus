@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Link, NavLink, useLocation } from '../lib/router.jsx';
-import { useAuthStatus, useLogout } from '../lib/queries.js';
 
 const NAVIGATION = [
   { to: '/today', label: 'Today' },
@@ -25,11 +24,6 @@ const NAVIGATION = [
 export function Layout({ children, assistant }) {
   const [navigationOpen, setNavigationOpen] = useState(false);
   const location = useLocation();
-  const status = useAuthStatus();
-  const logout = useLogout();
-
-  const principal = status.data?.owner;
-  const authenticated = status.data?.authenticated;
 
   return (
     <div className="shell">
@@ -50,19 +44,7 @@ export function Layout({ children, assistant }) {
         <Link to="/today" className="brand">
           Nexus
         </Link>
-        <div className="topbar-meta">
-          {status.data?.writeOperationsEnabled === false && (
-            <span className="badge badge-warning" title="Vault writes are disabled by configuration">
-              Read only
-            </span>
-          )}
-          {authenticated && principal && <span className="muted">{principal.email}</span>}
-          {authenticated && (
-            <button type="button" className="button button-ghost" onClick={() => logout.mutate()}>
-              Sign out
-            </button>
-          )}
-        </div>
+        <div className="topbar-meta" />
       </header>
 
       <div className="body">

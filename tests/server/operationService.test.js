@@ -5,7 +5,6 @@ import { AuditService } from '../../server/services/auditService.js';
 import { OperationService } from '../../server/services/operationService.js';
 import { loadEnv } from '../../server/config/env.js';
 import { createStores } from '../../server/stores/memoryStore.js';
-import { hashPassword } from '../../server/services/authService.js';
 import { createFakeGitHub } from '../helpers/fakeGitHub.js';
 
 const ACTOR = { id: 'owner', email: 'owner@example.test' };
@@ -20,9 +19,6 @@ const FILES = {
 function build({ destructive = false, autoApproveLowRisk = true, files = FILES } = {}) {
   const env = loadEnv({
     PORT: '5000',
-    SESSION_SECRET: 'test-secret',
-    OWNER_EMAIL: 'owner@example.test',
-    OWNER_PASSWORD_HASH: hashPassword('a-sufficiently-long-password'),
     GITHUB_TOKEN: 'token',
     GITHUB_OWNER: 'kofiarhin',
     WRITE_OPERATIONS_ENABLED: 'true',
@@ -164,7 +160,7 @@ describe('proposing an operation', () => {
 
 describe('write and destructive feature flags', () => {
   it('refuses every mutation when writes are disabled', async () => {
-    const env = loadEnv({ PORT: '5000', SESSION_SECRET: 'x', GITHUB_TOKEN: 't', GITHUB_OWNER: 'o' });
+    const env = loadEnv({ PORT: '5000', GITHUB_TOKEN: 't', GITHUB_OWNER: 'o' });
     const { fetchImpl } = createFakeGitHub({ files: FILES });
     const service = new OperationService({
       env,

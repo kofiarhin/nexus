@@ -2,13 +2,10 @@
 import request from 'supertest';
 import { createApp } from '../../server/app.js';
 
-// These cases cover Vault error normalization and the response envelope, so
-// they run with authentication disabled. Authentication and authorization have
-// their own suite in tests/integration/auth.test.js.
+// These cases cover Vault error normalization and the response envelope.
 const environment = {
   PORT: '5000',
   CLIENT_URL: 'http://localhost:5173',
-  AUTH_ENABLED: 'false',
   LOG_ENABLED: 'false',
   GITHUB_TOKEN: 'token',
   GITHUB_OWNER: 'kofiarhin',
@@ -16,7 +13,7 @@ const environment = {
   GITHUB_VAULT_BRANCH: 'main'
 };
 
-const unconfiguredEnvironment = { PORT: '5000', AUTH_ENABLED: 'false', LOG_ENABLED: 'false' };
+const unconfiguredEnvironment = { PORT: '5000', LOG_ENABLED: 'false' };
 
 const projectRegistry = '| Project | Summary |\n| --- | --- |\n| [Alpha](projects/alpha.md) | First project |';
 

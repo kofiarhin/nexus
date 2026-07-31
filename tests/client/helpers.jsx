@@ -66,13 +66,3 @@ export function renderWithProviders(ui, { path = '/today', queryClient = createT
 
   return { ...result, queryClient };
 }
-
-/** Standard authenticated status payload used by most page tests. */
-export const AUTH_STATUS = {
-  authEnabled: true,
-  authConfigured: true,
-  authenticated: true,
-  owner: { email: 'owner@example.test', name: 'Owner' },
-  writeOperationsEnabled: true,
-  destructiveOperationsEnabled: false
-};

@@ -11,7 +11,7 @@ const SOURCES = [
 ];
 
 const providerFor = (fetchImpl, overrides = {}) => createReasoningProvider({
-  env: loadEnv({ PORT: '5000', SESSION_SECRET: 'x', ...NVIDIA_ENVIRONMENT, ...overrides }),
+  env: loadEnv({ PORT: '5000', ...NVIDIA_ENVIRONMENT, ...overrides }),
   fetchImpl
 });
 
@@ -52,7 +52,6 @@ describe('generateAnswer', () => {
     const prompt = JSON.stringify(state.requests[0].body);
     expect(prompt).toContain('projects/nexus/PROJECT.md');
     expect(prompt).not.toContain('test-nvidia-key');
-    expect(prompt).not.toContain('SESSION_SECRET');
     expect(prompt).not.toContain('GITHUB_TOKEN');
   });
 

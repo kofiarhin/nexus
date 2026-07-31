@@ -16,7 +16,7 @@ import { appError } from '../../utils/errors.js';
  *
  * The provider returns proposals and prose only. Everything it produces is
  * treated as untrusted input: operation candidates are schema-validated here
- * and re-authorized by the operation service before anything is written.
+ * and re-checked by the operation service before anything is written.
  */
 export function createNvidiaProvider({ client, logger }) {
   const run = async (event, messages, options) => {

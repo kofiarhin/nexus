@@ -1,7 +1,7 @@
 # Nexus
 
 Nexus is a second brain and business operations command center. Canonical knowledge lives as Markdown
-in a GitHub-hosted Vault; deterministic retrieval, validation, permissions, and CRUD stay separate from
+in a GitHub-hosted Vault; deterministic retrieval, validation, path policy, and CRUD stay separate from
 AI reasoning. NVIDIA provides conversation, synthesis, planning, and operation proposals over
 deliberately selected Vault context.
 
@@ -15,9 +15,10 @@ in [docs/IMPLEMENTATION-NOTES.md](docs/IMPLEMENTATION-NOTES.md).
 records in it.** Nexus reads and writes whatever the configured token can reach; it cannot make a
 public repository safe.
 
-- Never commit `.env`, tokens, passwords, session secrets, or Vault content.
+- Never commit `.env`, tokens, passwords, or Vault content.
 - GitHub and NVIDIA credentials stay server-side. Only `VITE_`-prefixed variables reach the browser.
-- Writes are disabled by default and stay disabled until owner authentication is configured.
+- All MVP API endpoints are public. Do not expose the API beyond trusted local/private networks.
+- Writes are disabled by default and stay disabled until `WRITE_OPERATIONS_ENABLED=true`.
 - Hard delete is disabled by default; archive is the default removal method.
 
 ## Requirements
@@ -48,29 +49,16 @@ repository only:
 No other repository permission is needed. Without a token the API still runs and returns a controlled
 `VAULT_NOT_CONFIGURED` response from Vault-backed routes.
 
-### 2. Configure owner sign-in
-
-Nexus is single-owner. Generate a password hash — the password itself is never written anywhere:
-
-```bash
-npm run auth:hash
-```
-
-Copy the printed `OWNER_PASSWORD_HASH` into `.env`, set `OWNER_EMAIL`, and set a long random
-`SESSION_SECRET`. Without `SESSION_SECRET` the server generates an ephemeral one at boot, so sessions
-do not survive a restart; in production it is required.
-
-### 3. Enable writes when you are ready
+### 2. Enable writes when you are ready
 
 ```env
 WRITE_OPERATIONS_ENABLED=true
 DESTRUCTIVE_OPERATIONS_ENABLED=false
 ```
 
-Writes activate only when `WRITE_OPERATIONS_ENABLED` is true **and** owner authentication is
-configured. `GET /api/v1/settings` reports exactly why writes are on or off.
+Writes activate when `WRITE_OPERATIONS_ENABLED` is true. `GET /api/v1/settings` reports exactly why writes are on or off.
 
-### 4. Bootstrap a Vault (optional)
+### 3. Bootstrap a Vault (optional)
 
 ```bash
 npm run vault:bootstrap ./vault-bootstrap
@@ -92,7 +80,6 @@ files. Review the output, then commit it to your private Vault repository yourse
 | `npm run test:watch` | Run the suite in watch mode |
 | `npm run lint` | Syntax-check server, client, test, and script files |
 | `npm run verify` | Lint, test, and build in one command |
-| `npm run auth:hash` | Generate `OWNER_PASSWORD_HASH` |
 | `npm run vault:bootstrap` | Write starter Vault documents locally |
 
 ## Architecture
@@ -105,12 +92,12 @@ client/
   components/   layout, primitives, view states, operation review
   pages/        one module per primary route
 server/
-  routes/       versioned HTTP paths, authorization and validation binding
+  routes/       versioned HTTP paths and validation binding
   controllers/  HTTP translation only
   services/     operations, planning, conversation, memory, retrieval, reports
   repositories/ Vault access and Markdown parsing
   integrations/ GitHub Contents API, NVIDIA reasoning adapter
-  middleware/   request IDs, auth, CSRF, rate limits, validation, errors
+  middleware/   request IDs, rate limits, validation, errors
   schemas/      validation for all external and model-generated input
   stores/       process-scoped operation, audit, and conversation records
   config/       environment validation and the operation policy
@@ -123,9 +110,7 @@ services, so validation, diffs, approval, concurrency, and audit behave identica
 ### What NVIDIA does and does not do
 
 NVIDIA handles conversation, intent interpretation, summarisation, planning, report narratives, and
-structured operation proposals. It never performs authentication, authorization, exact retrieval,
-validation, GitHub writes, conflict detection, approval, or completion. Model output is untrusted
-input: every proposed operation is schema-validated, path-checked, and re-authorized server-side.
+structured operation proposals. It never performs access control, exact retrieval, validation, GitHub writes, conflict detection, approval, or completion. Model output is untrusted input: every proposed operation is schema-validated and path-checked server-side.
 
 ## API
 
@@ -134,20 +119,15 @@ All routes are served under `/api/v1`. Responses use
 `{ "success": false, "error": { "code": "...", "message": "...", "details": {} }, "requestId": "uuid" }`.
 Every response carries `x-request-id`, preserving a supplied ID.
 
-Mutating requests require the `x-csrf-token` header echoing the `nexus_csrf` cookie, and accept an
-optional `idempotency-key` header.
+All endpoints are public for the MVP. Mutating requests accept an optional `idempotency-key` header.
 
-### Health and authentication
+### Health
 
 | Route | Description |
 | --- | --- |
 | `GET /health` | Service liveness |
 | `GET /health/vault` | Vault configuration and write flags (no connectivity probe) |
 | `GET /health/ai` | Reasoning provider configuration |
-| `GET /auth/status` | Public: whether auth is enabled, configured, and active |
-| `POST /auth/login` | Owner sign-in; sets session and CSRF cookies |
-| `GET /auth/session` | Current principal |
-| `POST /auth/logout` | Ends the session |
 
 ### Workspace
 
@@ -194,10 +174,7 @@ optional `idempotency-key` header.
 ### Error codes
 
 ```text
-AUTH_REQUIRED  AUTH_NOT_CONFIGURED  INVALID_CREDENTIALS  FORBIDDEN
-VALIDATION_ERROR  INVALID_JSON  PATH_NOT_ALLOWED  OPERATION_NOT_ALLOWED
-APPROVAL_REQUIRED  DESTRUCTIVE_CONFIRMATION_REQUIRED  IDEMPOTENCY_CONFLICT
-CSRF_TOKEN_INVALID  RATE_LIMITED
+FORBIDDEN  VALIDATION_ERROR  INVALID_JSON  PATH_NOT_ALLOWED  OPERATION_NOT_ALLOWED`r`nAPPROVAL_REQUIRED  DESTRUCTIVE_CONFIRMATION_REQUIRED  IDEMPOTENCY_CONFLICT`r`nRATE_LIMITED
 VAULT_NOT_CONFIGURED  VAULT_FILE_NOT_FOUND  VAULT_FILE_EXISTS  VAULT_CONFLICT
 VAULT_UPSTREAM_ERROR  VAULT_WRITE_DISABLED
 AI_NOT_CONFIGURED  AI_UPSTREAM_ERROR  AI_TIMEOUT  CONTEXT_LIMIT_EXCEEDED
@@ -206,10 +183,7 @@ NOT_FOUND  CONFLICT  INTERNAL_ERROR
 
 ## Mutation pipeline
 
-Every write — manual or conversational — follows the same sequence: authenticate, authorize the action
-and path, read the current revision, validate, compute the before/after diff, classify risk, require
-approval where policy demands it, re-read immediately before writing, apply with optimistic
-concurrency, verify by readback, record the Git commit, and write an audit event.
+Every write, manual or conversational, follows the same sequence: check the action and path policy, read the current revision, validate, compute the before/after diff, classify risk, require approval where policy demands it, re-read immediately before writing, apply with optimistic concurrency, verify by readback, record the Git commit, and write an audit event.
 
 Risk classification is deterministic and server-side:
 
@@ -266,8 +240,7 @@ npm run lint
 npm run build:client
 ```
 
-Then start the API with `npm start` and the client with `npm run dev:client`, and smoke-test sign-in,
-`GET /api/v1/health`, project and task retrieval, the Vault tree, a document read, a write flow, a
+Then start the API with `npm start` and the client with `npm run dev:client`, and smoke-test `GET /api/v1/health`, project and task retrieval, the Vault tree, a document read, a write flow, a
 conflict, an approval, and the activity history.
 
 Tests never use real GitHub or NVIDIA credentials: both are driven by in-memory fixtures.
@@ -277,20 +250,16 @@ Tests never use real GitHub or NVIDIA credentials: both are driven by in-memory 
 Heroku starts the API with `npm start` via the `Procfile`, listening on `process.env.PORT`. Vercel
 builds the client with `npm run build:client` and serves `dist/client`.
 
-Production readiness additionally requires a private Vault, `SESSION_SECRET`, HTTPS with
-`COOKIE_SECURE=true`, a `CLIENT_URL` matching the deployed origin, and verified backup and rollback
-procedures. No production deployment is established by this repository.
+Production readiness additionally requires authentication, HTTPS, a private Vault, a `CLIENT_URL` matching the deployed origin, and verified backup and rollback procedures. No production deployment is established by this repository.
 
 ## Known limitations
 
 - Operations, audit events, conversations, and idempotency keys are held in memory per process. They
   are operational traceability, not canonical records; a restart clears them. Git history and Vault
   Markdown remain the durable record.
-- Sessions are stateless signed cookies. Without `SESSION_SECRET`, a restart invalidates them; there is
-  no server-side revocation list.
 - Search reads a bounded number of Markdown files per query (`SEARCH_MAX_FILES`). Very large Vaults may
   need a derived index, which the current specification does not require.
 - Move is create-then-delete because the GitHub Contents API has no atomic rename. The destination is
   written first, so a failure never loses the source.
-- Authorization is owner-only. Multi-user roles need a separate approved permission model.
+- Authentication and user authorization are not implemented in this MVP. Every endpoint is public to anyone who can reach the API.
 - Live NVIDIA calls, production GitHub writes, and deployment are unverified in this repository.

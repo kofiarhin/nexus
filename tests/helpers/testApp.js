@@ -1,13 +1,6 @@
 import request from 'supertest';
 import { createApp } from '../../server/app.js';
-import { hashPassword } from '../../server/services/authService.js';
 import { createFakeGitHub } from './fakeGitHub.js';
-
-export const OWNER_EMAIL = 'owner@example.test';
-export const OWNER_PASSWORD = 'correct horse battery staple';
-
-/** Hash generated per run; no credential is ever committed. */
-export const OWNER_PASSWORD_HASH = hashPassword(OWNER_PASSWORD);
 
 export const VAULT_FIXTURES = {
   'NEXUS.md': '# Nexus workspace rules\n\nDeterministic retrieval happens before reasoning.\n',
@@ -119,11 +112,7 @@ const BASE_ENVIRONMENT = {
   GITHUB_TOKEN: 'test-token-value',
   GITHUB_OWNER: 'kofiarhin',
   GITHUB_VAULT_REPO: 'nexus-vault',
-  GITHUB_VAULT_BRANCH: 'main',
-  SESSION_SECRET: 'test-session-secret-value-not-a-real-secret',
-  OWNER_EMAIL,
-  OWNER_NAME: 'Owner',
-  AUTH_ENABLED: 'true'
+  GITHUB_VAULT_BRANCH: 'main'
 };
 
 /**
@@ -141,7 +130,6 @@ export function createTestApp({
   const app = createApp({
     environment: {
       ...BASE_ENVIRONMENT,
-      OWNER_PASSWORD_HASH,
       ...environment
     },
     fetchImpl,
@@ -152,28 +140,13 @@ export function createTestApp({
   return { app, vault: state, agent: request.agent(app) };
 }
 
-/** Signs in and returns an agent carrying the session and CSRF cookies. */
-export async function signIn(app, { email = OWNER_EMAIL, password = OWNER_PASSWORD } = {}) {
+/** Returns a Supertest agent and mutation helper for the public MVP API. */
+export async function createPublicClient(app) {
   const agent = request.agent(app);
-  const response = await agent.post('/api/v1/auth/login').send({ email, password });
-  if (response.status !== 200) {
-    throw new Error(`Sign-in failed: ${response.status} ${JSON.stringify(response.body)}`);
-  }
-
-  const csrf = extractCookie(response.headers['set-cookie'], 'nexus_csrf');
-
   return {
     agent,
-    csrf,
-    /** Issues a mutating request with the CSRF header already attached. */
-    send: (method, path) => agent[method](path).set('x-csrf-token', csrf)
+    send: (method, path) => agent[method](path)
   };
-}
-
-export function extractCookie(setCookieHeader, name) {
-  const cookies = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader ?? ''];
-  const match = cookies.find((cookie) => cookie.startsWith(`${name}=`));
-  return match ? decodeURIComponent(match.slice(name.length + 1).split(';')[0]) : null;
 }
 
 /** Environment that enables writes, and optionally destructive operations. */

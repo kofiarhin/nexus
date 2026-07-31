@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createTestApp, signIn, writeEnabled } from '../helpers/testApp.js';
+import { createTestApp, createPublicClient, writeEnabled } from '../helpers/testApp.js';
 
 describe('projects and businesses', () => {
   it('returns a full project record with its sources', async () => {
     const { app } = createTestApp();
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const response = await agent.get('/api/v1/projects/nexus');
 
@@ -16,13 +16,13 @@ describe('projects and businesses', () => {
 
   it('reports an unknown project as not found', async () => {
     const { app } = createTestApp();
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
     expect((await agent.get('/api/v1/projects/nope')).status).toBe(404);
   });
 
   it('lists businesses and returns a full business record', async () => {
     const { app } = createTestApp();
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const list = await agent.get('/api/v1/businesses');
     expect(list.body.data.businesses[0]).toMatchObject({ id: 'acme', name: 'Acme Studio' });
@@ -34,7 +34,7 @@ describe('projects and businesses', () => {
 
   it('reports an empty business list rather than failing without a registry', async () => {
     const { app } = createTestApp({ files: { 'registry/PROJECTS.md': '| a | A | active | projects/a.md | 2026 |' } });
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const response = await agent.get('/api/v1/businesses');
     expect(response.status).toBe(200);
@@ -45,7 +45,7 @@ describe('projects and businesses', () => {
 describe('tasks', () => {
   it('lists tasks from every task document with their sources', async () => {
     const { app } = createTestApp();
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const response = await agent.get('/api/v1/tasks');
 
@@ -61,7 +61,7 @@ describe('tasks', () => {
 
   it('applies the today and overdue views deterministically', async () => {
     const { app } = createTestApp();
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const today = await agent.get('/api/v1/tasks/today');
     const overdue = await agent.get('/api/v1/tasks?view=overdue');
@@ -72,7 +72,7 @@ describe('tasks', () => {
 
   it('filters by project', async () => {
     const { app } = createTestApp();
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const response = await agent.get('/api/v1/tasks?projectId=nexus');
     expect(response.body.data.tasks.map((task) => task.id)).toEqual(['tsk-project']);
@@ -80,7 +80,7 @@ describe('tasks', () => {
 
   it('rejects an unsupported view', async () => {
     const { app } = createTestApp();
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const response = await agent.get('/api/v1/tasks?view=everything');
     expect(response.status).toBe(400);
@@ -89,7 +89,7 @@ describe('tasks', () => {
 
   it('creates a task by appending one annotated line', async () => {
     const { app, vault } = createTestApp({ environment: writeEnabled() });
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     const response = await send('post', '/api/v1/tasks').send({
       name: 'Draft the launch plan',
@@ -111,7 +111,7 @@ describe('tasks', () => {
 
   it('validates a task payload', async () => {
     const { app } = createTestApp({ environment: writeEnabled() });
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     const response = await send('post', '/api/v1/tasks').send({ name: '', priority: 'urgent' });
 
@@ -121,7 +121,7 @@ describe('tasks', () => {
 
   it('completes a task in place, preserving the rest of the document', async () => {
     const { app, vault } = createTestApp({ environment: writeEnabled() });
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     const response = await send('patch', '/api/v1/tasks/tsk-review').send({ status: 'done' });
 
@@ -136,7 +136,7 @@ describe('tasks', () => {
 
   it('reopens a completed task', async () => {
     const { app, vault } = createTestApp({ environment: writeEnabled() });
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     await send('patch', '/api/v1/tasks/tsk-shipped').send({ status: 'todo' });
     expect(vault.read('tasks/TASKS.md')).toContain('- [ ] Ship the foundation');
@@ -144,7 +144,7 @@ describe('tasks', () => {
 
   it('deletes a task line without touching neighbouring lines', async () => {
     const { app, vault } = createTestApp({ environment: writeEnabled() });
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     const response = await send('delete', '/api/v1/tasks/tsk-review').send({});
 
@@ -157,7 +157,7 @@ describe('tasks', () => {
 
   it('reports an unknown task as not found', async () => {
     const { app } = createTestApp({ environment: writeEnabled() });
-    const { agent, send } = await signIn(app);
+    const { agent, send } = await createPublicClient(app);
 
     expect((await agent.get('/api/v1/tasks/tsk-missing')).status).toBe(404);
     expect((await send('patch', '/api/v1/tasks/tsk-missing').send({ status: 'done' })).status).toBe(404);
@@ -165,7 +165,7 @@ describe('tasks', () => {
 
   it('edits a task in a project task document', async () => {
     const { app, vault } = createTestApp({ environment: writeEnabled() });
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     await send('patch', '/api/v1/tasks/tsk-project').send({ priority: 'critical' });
 
@@ -177,7 +177,7 @@ describe('tasks', () => {
 describe('Today planning', () => {
   it('builds a source-grounded plan without any reasoning provider', async () => {
     const { app } = createTestApp();
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const response = await agent.get('/api/v1/planning/today');
 
@@ -194,7 +194,7 @@ describe('Today planning', () => {
 
   it('gives every recommendation a reason and a source', async () => {
     const { app } = createTestApp();
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const response = await agent.get('/api/v1/planning/today');
 
@@ -208,7 +208,7 @@ describe('Today planning', () => {
 
   it('ranks overdue work above undated work', async () => {
     const { app } = createTestApp();
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const response = await agent.get('/api/v1/planning/today');
     const ids = response.body.data.recommendations.map((recommendation) => recommendation.taskId);
@@ -219,7 +219,7 @@ describe('Today planning', () => {
 
   it('surfaces unresolved project questions and business alerts', async () => {
     const { app } = createTestApp();
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const response = await agent.get('/api/v1/planning/today');
 
@@ -234,7 +234,7 @@ describe('Today planning', () => {
 describe('inbox, daily notes, and knowledge', () => {
   it('captures an inbox item without classifying it', async () => {
     const { app, vault } = createTestApp({ environment: writeEnabled() });
-    const { agent, send } = await signIn(app);
+    const { agent, send } = await createPublicClient(app);
 
     const response = await send('post', '/api/v1/inbox').send({ content: 'A new idea worth keeping', kind: 'idea' });
 
@@ -248,7 +248,7 @@ describe('inbox, daily notes, and knowledge', () => {
 
   it('reports that a suggestion needs the reasoning provider', async () => {
     const { app } = createTestApp({ environment: writeEnabled() });
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const response = await agent.get('/api/v1/inbox/inb-existing/suggestion');
 
@@ -259,7 +259,7 @@ describe('inbox, daily notes, and knowledge', () => {
 
   it('reads a daily note and appends an entry under a section', async () => {
     const { app, vault } = createTestApp({ environment: writeEnabled() });
-    const { agent, send } = await signIn(app);
+    const { agent, send } = await createPublicClient(app);
 
     const existing = await agent.get('/api/v1/daily/2026-07-30');
     expect(existing.body.data.note.plan).toEqual(['Draft the specification']);
@@ -273,7 +273,7 @@ describe('inbox, daily notes, and knowledge', () => {
 
   it('creates a daily note when the day has none', async () => {
     const { app, vault } = createTestApp({ environment: writeEnabled() });
-    const { agent, send } = await signIn(app);
+    const { agent, send } = await createPublicClient(app);
 
     const missing = await agent.get('/api/v1/daily/2026-07-31');
     expect(missing.body.data.note.exists).toBe(false);
@@ -284,7 +284,7 @@ describe('inbox, daily notes, and knowledge', () => {
 
   it('lists knowledge notes and returns one with links and backlinks', async () => {
     const { app } = createTestApp();
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const list = await agent.get('/api/v1/knowledge');
     expect(list.body.data.notes.map((note) => note.path)).toContain('knowledge/retrieval.md');
@@ -298,7 +298,7 @@ describe('inbox, daily notes, and knowledge', () => {
 describe('reports', () => {
   it('generates a deterministic daily report with sources', async () => {
     const { app } = createTestApp();
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const response = await agent.get('/api/v1/reports?type=daily');
 
@@ -312,7 +312,7 @@ describe('reports', () => {
 
   it('generates project and business reports', async () => {
     const { app } = createTestApp();
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const project = await agent.get('/api/v1/reports?type=project&id=nexus');
     expect(project.body.data.report.facts.openQuestions).toEqual(['Where should reports live?']);
@@ -323,7 +323,7 @@ describe('reports', () => {
 
   it('rejects an unsupported report type', async () => {
     const { app } = createTestApp();
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const response = await agent.get('/api/v1/reports?type=quarterly');
     expect(response.status).toBe(400);
@@ -333,7 +333,7 @@ describe('reports', () => {
 describe('settings', () => {
   it('reports configuration state without exposing any secret', async () => {
     const { app } = createTestApp({ environment: writeEnabled() });
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const response = await agent.get('/api/v1/settings');
     const body = JSON.stringify(response.body);
@@ -343,7 +343,6 @@ describe('settings', () => {
     expect(response.body.data.operations.writeOperationsEnabled).toBe(true);
     expect(response.body.data.operations.allowedActions).not.toContain('delete');
     expect(body).not.toContain('test-token-value');
-    expect(body).not.toContain('test-session-secret');
   });
 
   it('reports health for the Vault and the reasoning provider', async () => {
@@ -352,7 +351,7 @@ describe('settings', () => {
     const vault = await createTestApp().app;
     expect(vault).toBeTruthy();
 
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
     const ai = await agent.get('/api/v1/health/ai');
 
     expect(ai.status).toBe(200);

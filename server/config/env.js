@@ -1,6 +1,4 @@
 import 'dotenv/config';
-import { randomBytes } from 'node:crypto';
-
 const DEFAULT_READ_PATHS = [
   'registry',
   'projects',
@@ -60,21 +58,6 @@ export function loadEnv(environment = process.env) {
   const nodeEnv = environment.NODE_ENV ?? 'development';
   const isProduction = nodeEnv === 'production';
 
-  const authEnabled = parseBoolean(environment.AUTH_ENABLED, true);
-  const ownerEmail = (environment.OWNER_EMAIL ?? '').trim().toLowerCase();
-  const ownerPasswordHash = (environment.OWNER_PASSWORD_HASH ?? '').trim();
-  const ownerConfigured = Boolean(ownerEmail && ownerPasswordHash);
-
-  let sessionSecret = (environment.SESSION_SECRET ?? '').trim();
-  if (!sessionSecret) {
-    if (isProduction && authEnabled) {
-      throw new Error('SESSION_SECRET is required when authentication is enabled in production');
-    }
-    // Ephemeral secret: sessions do not survive a restart, but no default
-    // secret is ever baked into the repository.
-    sessionSecret = randomBytes(32).toString('hex');
-  }
-
   const githubToken = environment.GITHUB_TOKEN ?? '';
   const githubOwner = environment.GITHUB_OWNER ?? '';
   const githubVaultRepo = environment.GITHUB_VAULT_REPO ?? 'nexus-vault';
@@ -86,9 +69,7 @@ export function loadEnv(environment = process.env) {
     false
   );
 
-  // Mutations stay disabled unless an authenticated owner can actually be
-  // identified: specification section 8 forbids reachable unauthenticated writes.
-  const writeOperationsEnabled = writeOperationsRequested && authEnabled && ownerConfigured;
+  const writeOperationsEnabled = writeOperationsRequested;
   const destructiveOperationsEnabled = destructiveOperationsRequested && writeOperationsEnabled;
 
   const nvidiaApiKey = environment.NVIDIA_API_KEY ?? '';
@@ -113,15 +94,6 @@ export function loadEnv(environment = process.env) {
     nvidiaMaxOutputTokens: parseInteger(environment.NVIDIA_MAX_OUTPUT_TOKENS, 1200, 'NVIDIA_MAX_OUTPUT_TOKENS'),
     aiConfigured: Boolean(nvidiaApiKey),
 
-    authEnabled,
-    ownerEmail,
-    ownerPasswordHash,
-    ownerName: (environment.OWNER_NAME ?? 'Owner').trim(),
-    ownerConfigured,
-    sessionSecret,
-    sessionTtlMinutes: parseInteger(environment.SESSION_TTL_MINUTES, 720, 'SESSION_TTL_MINUTES'),
-    cookieSecure: parseBoolean(environment.COOKIE_SECURE, isProduction),
-
     writeOperationsRequested,
     writeOperationsEnabled,
     destructiveOperationsRequested,
@@ -138,7 +110,6 @@ export function loadEnv(environment = process.env) {
 
     rateLimitWindowMs: parseInteger(environment.RATE_LIMIT_WINDOW_MS, 60000, 'RATE_LIMIT_WINDOW_MS'),
     rateLimitMaxRequests: parseInteger(environment.RATE_LIMIT_MAX_REQUESTS, 600, 'RATE_LIMIT_MAX_REQUESTS'),
-    authRateLimitMaxRequests: parseInteger(environment.AUTH_RATE_LIMIT_MAX_REQUESTS, 10, 'AUTH_RATE_LIMIT_MAX_REQUESTS'),
 
     logEnabled: parseBoolean(environment.LOG_ENABLED, nodeEnv !== 'test')
   };

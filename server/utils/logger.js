@@ -2,7 +2,7 @@ import { redact } from './redact.js';
 
 /**
  * Structured, redacted event logging (specification section 23).
- * Logs never carry credentials, session values, or full document bodies.
+ * Logs never carry credentials or full document bodies.
  */
 export function createLogger({ enabled = true, sink = console } = {}) {
   const emit = (level, event, fields) => {

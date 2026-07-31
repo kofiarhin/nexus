@@ -78,11 +78,10 @@ export function createReportController({ reportService }) {
 }
 
 /** Read-only settings view: configuration state, never secret values. */
-export function createSettingsController({ env, authService, provider, githubClient, operationService }) {
+export function createSettingsController({ env, provider, githubClient, operationService }) {
   return {
     get(req, res) {
       return ok(res, {
-        authentication: authService.status(),
         vault: {
           repository: githubClient.repositoryName,
           branch: githubClient.branch,

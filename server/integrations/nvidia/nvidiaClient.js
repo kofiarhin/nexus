@@ -3,7 +3,7 @@ import { appError } from '../../utils/errors.js';
 /**
  * Low-level NVIDIA chat-completions client (OpenAI-compatible endpoint).
  *
- * The client never sees Vault credentials or session values: the caller passes
+ * The client never sees Vault credentials: the caller passes
  * an already-bounded set of messages. All upstream failures normalize to
  * AI_UPSTREAM_ERROR or AI_TIMEOUT so no provider payload reaches a response.
  */

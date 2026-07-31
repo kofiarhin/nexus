@@ -1,12 +1,5 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000/api/v1';
 
-const CSRF_COOKIE = 'nexus_csrf';
-
-export function readCookie(name) {
-  const match = document.cookie.split('; ').find((entry) => entry.startsWith(`${name}=`));
-  return match ? decodeURIComponent(match.slice(name.length + 1)) : null;
-}
-
 /**
  * Error carrying the server's normalized code so the UI can distinguish
  * permission, conflict, validation, and upstream states instead of showing one
@@ -20,10 +13,6 @@ export class ApiError extends Error {
     this.details = details ?? null;
     this.status = status ?? 0;
     this.requestId = requestId ?? null;
-  }
-
-  get isAuthError() {
-    return this.code === 'AUTH_REQUIRED' || this.code === 'INVALID_CREDENTIALS';
   }
 
   get isConflict() {
@@ -40,25 +29,18 @@ export class ApiError extends Error {
 }
 
 /**
- * Single API entry point. Sends the session cookie, echoes the CSRF token on
- * mutations, and converts every failure into an ApiError.
+ * Single API entry point. Converts every failure into an ApiError.
  */
 export async function apiRequest(path, { method = 'GET', body, idempotencyKey, signal } = {}) {
   const headers = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (idempotencyKey) headers['idempotency-key'] = idempotencyKey;
 
-  if (method !== 'GET' && method !== 'HEAD') {
-    const csrf = readCookie(CSRF_COOKIE);
-    if (csrf) headers['x-csrf-token'] = csrf;
-  }
-
   let response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       method,
       headers,
-      credentials: 'include',
       signal,
       ...(body !== undefined ? { body: JSON.stringify(body) } : {})
     });
@@ -89,13 +71,10 @@ export async function apiRequest(path, { method = 'GET', body, idempotencyKey, s
 /** Opens a Server-Sent Events stream for a streamed conversation reply. */
 export async function apiStream(path, { body, onEvent, signal }) {
   const headers = { 'Content-Type': 'application/json', Accept: 'text/event-stream' };
-  const csrf = readCookie(CSRF_COOKIE);
-  if (csrf) headers['x-csrf-token'] = csrf;
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
     headers,
-    credentials: 'include',
     body: JSON.stringify(body),
     signal
   });

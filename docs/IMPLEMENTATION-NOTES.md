@@ -63,40 +63,35 @@ sanitization requirement without a renderer plus a sanitizer dependency.
 approving a Vault mutation, so the output has to be deterministic and directly testable. Input is
 bounded at 4000 lines so a large document cannot allocate an unbounded matrix.
 
-### Session and CSRF handling
+### Public MVP access
 
-Sessions are stateless HMAC-signed cookies (`httpOnly`, `SameSite=Lax`), and passwords are hashed with
-scrypt from `node:crypto`. No session store or additional dependency is involved.
+Authentication has been deferred. The Express router exposes every endpoint publicly to clients that
+can reach the API.
 
-CSRF uses a double-submit token, applied only to mutating requests that actually carry a session
-cookie. Sign-in has no session to ride on yet, and every other unauthenticated mutation is refused by
-the auth guard regardless.
+This is an MVP/local-development posture, not production security. Keep the API and Vault private
+until a separate authentication design is implemented.
 
-### Writes gated on authentication
+### Writes gated on operation flags
 
-`WRITE_OPERATIONS_ENABLED=true` alone does not enable writes. `loadEnv` also requires
-`AUTH_ENABLED=true` and configured owner credentials, because specification section 8 forbids
-reachable unauthenticated mutations. `GET /api/v1/settings` reports both the requested and the
-effective state so the discrepancy is visible rather than silent.
+`WRITE_OPERATIONS_ENABLED=true` enables mutation flows. Destructive writes still require
+`DESTRUCTIVE_OPERATIONS_ENABLED=true`, explicit approval, and destructive confirmation where policy
+requires it.
 
 ## Deviations from the specification
 
-1. **`GET /api/v1/projects` now requires authentication.** It was previously public. Specification
-   section 8 requires that unauthenticated requests cannot read private operational content. The
-   existing integration tests for that route were updated to run with `AUTH_ENABLED=false`, since
-   their subject is Vault error normalization; authentication has its own suite.
+1. **Authentication is deferred.** All endpoints are public for the MVP, so production exposure now
+   requires a future authentication feature rather than the previous owner sign-in flow.
 
 2. **`GET /health/vault` gained two fields.** It now also reports `writeOperationsEnabled` and
    `destructiveOperationsEnabled`. Existing fields are unchanged.
 
 3. **Additional error codes.** The specification lists codes it "includes". This build adds
-   `AUTH_NOT_CONFIGURED`, `INVALID_CREDENTIALS`, `VAULT_FILE_EXISTS`, `VAULT_WRITE_DISABLED`,
-   `AI_TIMEOUT`, `RATE_LIMITED`, `CSRF_TOKEN_INVALID`, and `CONFLICT`, each mapped to a specific
-   failure that would otherwise collapse into a vaguer code.
+   `VAULT_FILE_EXISTS`, `VAULT_WRITE_DISABLED`, `AI_TIMEOUT`, `RATE_LIMITED`, and `CONFLICT`, each
+   mapped to a specific failure that would otherwise collapse into a vaguer code.
 
-4. **Additional routes.** Beyond section 18 the build adds `GET /auth/status`, `GET /tasks/summary`,
-   `GET /operations`, `GET /conversations`, `DELETE /conversations/:id`, inbox, daily-note, knowledge,
-   report, and settings routes. These are required by the client pages the PRD specifies.
+4. **Additional routes.** Beyond section 18 the build adds `GET /tasks/summary`, `GET /operations`,
+   `GET /conversations`, `DELETE /conversations/:id`, inbox, daily-note, knowledge, report, and
+   settings routes. These are required by the client pages the PRD specifies.
 
 5. **`GET /knowledge/note?path=` uses a query parameter** rather than a path segment, so Vault paths
    containing slashes need no double encoding.
@@ -108,7 +103,6 @@ effective state so the discrepancy is visible rather than silent.
 - The modal dialog's focus effect depended on an inline `onClose` prop, so it re-ran on every render
   and pulled focus out of the field being typed into after each keystroke. The handler now lives in a
   ref and the effect depends only on open state.
-- The CSRF middleware blocked sign-in itself, since no CSRF cookie exists before the first login.
 - `mutateAsync` calls in event handlers produced unhandled rejections on failure. A `runMutation`
   helper awaits them safely; the error still renders from the mutation state.
 
@@ -117,8 +111,8 @@ effective state so the discrepancy is visible rather than silent.
 - **In-memory operational state.** Operations, audit events, conversations, and idempotency keys live
   in a bounded per-process store and are cleared on restart. They provide traceability alongside Git,
   which remains the durable record. Persisting them needs an approved storage decision.
-- **No server-side session revocation.** Signing out clears the cookie; a stolen token remains valid
-  until it expires or `SESSION_SECRET` changes.
+- **No authentication yet.** Every endpoint is public to clients that can reach the API. This needs a
+  separate approved authentication feature before public production exposure.
 - **Bounded search.** Each query reads at most `SEARCH_MAX_FILES` Markdown documents. Responses report
   `scanned` and `truncated`. A derived index is deliberately not added; the specification does not
   require one until repository-native retrieval proves insufficient.

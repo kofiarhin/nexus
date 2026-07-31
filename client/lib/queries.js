@@ -3,8 +3,6 @@ import { apiRequest } from './api.js';
 
 /** Query keys are namespaced so a mutation can invalidate exactly what changed. */
 export const keys = {
-  authStatus: ['auth', 'status'],
-  session: ['auth', 'session'],
   settings: ['settings'],
   health: ['health'],
   projects: ['projects'],
@@ -41,13 +39,6 @@ const toQueryString = (params) => {
   const rendered = search.toString();
   return rendered ? `?${rendered}` : '';
 };
-
-export const useAuthStatus = () => useQuery({
-  queryKey: keys.authStatus,
-  queryFn: () => apiRequest('/auth/status'),
-  retry: false,
-  staleTime: 30_000
-});
 
 export const useSettings = () => useQuery({ queryKey: keys.settings, queryFn: () => apiRequest('/settings') });
 
@@ -163,16 +154,6 @@ export function useApiMutation({ request, invalidates = [] }) {
     }
   });
 }
-
-export const useLogin = () => useApiMutation({
-  request: (body) => apiRequest('/auth/login', { method: 'POST', body }),
-  invalidates: [keys.authStatus, keys.session]
-});
-
-export const useLogout = () => useApiMutation({
-  request: () => apiRequest('/auth/logout', { method: 'POST' }),
-  invalidates: [keys.authStatus, keys.session]
-});
 
 export const useCreateTask = () => useApiMutation({
   request: (body) => apiRequest('/tasks', { method: 'POST', body }),

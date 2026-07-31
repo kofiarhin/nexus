@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from '../../client/App.jsx';
-import { AUTH_STATUS, createApiStub, createTestQueryClient } from './helpers.jsx';
+import { createApiStub, createTestQueryClient } from './helpers.jsx';
 
 const PLAN = {
   date: '2026-07-31',
@@ -33,7 +33,7 @@ const PLAN = {
 
 /** Mounts the real App at a path, against a stubbed API. */
 function mountApp(routes, { path = '/today' } = {}) {
-  const stub = createApiStub({ '/auth/status': AUTH_STATUS, ...routes });
+  const stub = createApiStub(routes);
   vi.stubGlobal('fetch', vi.fn(stub.handler));
   window.history.replaceState({}, '', path);
   return { stub, ...render(<App queryClient={createTestQueryClient()} initialPath={path} />) };
@@ -45,46 +45,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('authentication gate', () => {
-  it('shows the sign-in screen when no session is active', async () => {
-    mountApp({ '/auth/status': { ...AUTH_STATUS, authenticated: false } });
+describe('public workspace', () => {
+  it('renders the command center without requesting a sign-in', async () => {
+    mountApp({ '/planning/today': PLAN });
 
-    expect(await screen.findByRole('heading', { name: 'Nexus' })).toBeTruthy();
-    expect(screen.getByLabelText(/email/i)).toBeTruthy();
-    expect(screen.getByRole('button', { name: /sign in/i })).toBeTruthy();
-    expect(screen.queryByRole('navigation', { name: 'Primary' })).toBeNull();
-  });
-
-  it('explains an unconfigured owner instead of offering a form', async () => {
-    mountApp({ '/auth/status': { ...AUTH_STATUS, authenticated: false, authConfigured: false } });
-
-    expect(await screen.findByText(/owner sign-in is not configured/i)).toBeTruthy();
-    expect(screen.queryByLabelText(/password/i)).toBeNull();
-  });
-
-  it('surfaces invalid credentials without clearing the form', async () => {
-    const user = userEvent.setup();
-    mountApp({
-      '/auth/status': { ...AUTH_STATUS, authenticated: false },
-      'POST /auth/login': { status: 401, error: { code: 'INVALID_CREDENTIALS', message: 'Email or password is incorrect' } }
-    });
-
-    await screen.findByLabelText(/email/i);
-    await user.type(screen.getByLabelText(/email/i), 'owner@example.test');
-    await user.type(screen.getByLabelText(/password/i), 'wrong');
-    await user.click(screen.getByRole('button', { name: /sign in/i }));
-
-    expect(await screen.findByRole('alert')).toBeTruthy();
-    expect(screen.getByText(/email or password is incorrect/i)).toBeTruthy();
-  });
-
-  it('reports an unreachable API rather than a blank screen', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => {
-      throw new Error('offline');
-    }));
-    render(<App queryClient={createTestQueryClient()} initialPath="/today" />);
-
-    expect(await screen.findByText(/cannot reach the api/i)).toBeTruthy();
+    expect(await screen.findByRole('navigation', { name: 'Primary' })).toBeTruthy();
+    expect(screen.queryByLabelText(/email/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: /sign in/i })).toBeNull();
   });
 });
 
@@ -131,15 +98,6 @@ describe('command center shell', () => {
     const toggle = screen.getByRole('button', { name: /menu/i });
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
     expect(toggle.getAttribute('aria-controls')).toBe('primary-navigation');
-  });
-
-  it('shows a read-only badge when Vault writes are disabled', async () => {
-    mountApp({
-      '/auth/status': { ...AUTH_STATUS, writeOperationsEnabled: false },
-      '/planning/today': PLAN
-    });
-
-    expect(await screen.findByText('Read only')).toBeTruthy();
   });
 
   it('renders a not-found state for an unknown route', async () => {
@@ -195,10 +153,9 @@ describe('Today', () => {
 });
 
 describe('Settings', () => {
-  it('reports configuration state and the reason writes are disabled', async () => {
+  it('reports public MVP configuration state', async () => {
     mountApp({
       '/settings': {
-        authentication: { authEnabled: true, authConfigured: false, owner: null },
         vault: { repository: 'kofiarhin/nexus-vault', branch: 'main', configured: true, readPaths: ['projects'], writePaths: ['tasks'] },
         reasoning: { provider: 'nvidia', configured: false, model: null, timeoutMs: 45000 },
         operations: {
@@ -215,8 +172,8 @@ describe('Settings', () => {
     }, { path: '/settings' });
 
     expect(await screen.findByRole('heading', { name: 'Settings', level: 1 })).toBeTruthy();
-    expect(screen.getByText(/writes remain disabled because owner authentication is not configured/i)).toBeTruthy();
-    expect(screen.getByText(/keep the vault repository private/i)).toBeTruthy();
+    expect(screen.queryByText(/authentication/i)).toBeNull();
+    expect(screen.getByText(/mvp endpoints are public/i)).toBeTruthy();
   });
 });
 
@@ -246,7 +203,7 @@ describe('Activity', () => {
     expect(within(table).getByText('cccccccccc')).toBeTruthy();
   });
 
-  it('reports an empty audit trail as a session-scoped state', async () => {
+  it('reports an empty audit trail as a server-run state', async () => {
     mountApp({ '/activity': { events: [] }, '/operations': { operations: [] } }, { path: '/activity' });
     expect(await screen.findByText(/no activity recorded/i)).toBeTruthy();
   });

@@ -10,7 +10,7 @@ export function createConversationController({ conversationService }) {
     create: asyncHandler(async (req, res) => {
       const conversation = conversationService.create({
         ...res.locals.body,
-        actor: res.locals.principal
+        actor: null
       });
       return created(res, { conversation });
     }),

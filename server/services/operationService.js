@@ -41,7 +41,7 @@ export class OperationService {
     if (!this.env.writeOperationsEnabled) {
       throw appError(
         'VAULT_WRITE_DISABLED',
-        'Vault write operations are disabled. Enable WRITE_OPERATIONS_ENABLED with owner authentication configured.'
+        'Vault write operations are disabled. Enable WRITE_OPERATIONS_ENABLED to allow mutations.'
       );
     }
   }

@@ -176,7 +176,7 @@ The activity view records:
 
 Settings manage:
 
-- authentication and session security;
+- future authentication and session security;
 - Vault repository and branch configuration;
 - NVIDIA model configuration;
 - approval and destructive-operation policies;
@@ -223,7 +223,7 @@ Settings
 ### Conversational write
 
 1. Interpret the request into a structured operation proposal.
-2. Authenticate and authorize the requested action.
+2. Check the requested action against operation policy.
 3. Read the current file and revision.
 4. Validate path, schema, operation type, and expected state.
 5. Produce a before/after diff.
@@ -297,7 +297,7 @@ Answers and generated plans must expose the Vault sources used. Search results m
 ## Security And Privacy
 
 - The Nexus Vault must be private before storing confidential personal, client, operational, or financial information.
-- Authentication is mandatory before enabling mutation APIs in any reachable environment.
+- Authentication is deferred for the MVP; do not expose mutation APIs beyond trusted local/private networks.
 - GitHub and NVIDIA credentials remain server-side and use least privilege.
 - Sensitive values are never written to Markdown, logs, responses, or model prompts.
 - Destructive operations require explicit confirmation.
@@ -309,7 +309,7 @@ Answers and generated plans must expose the Vault sources used. Search results m
 
 The first functional release should focus on:
 
-1. authenticated owner access;
+1. public MVP workspace access;
 2. private Vault readiness;
 3. project and Markdown navigation;
 4. deterministic document reading and search;
@@ -362,7 +362,7 @@ The target product is successful when Kofi can:
 
 ### Phase 3 — Controlled administration
 
-- Owner authentication
+- Authentication deferred beyond MVP
 - Private Vault configuration
 - Manual CRUD
 - optimistic concurrency and conflict handling

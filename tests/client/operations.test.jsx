@@ -7,7 +7,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { OperationReview } from '../../client/components/OperationReview.jsx';
 import { Dialog } from '../../client/components/Primitives.jsx';
 import App from '../../client/App.jsx';
-import { AUTH_STATUS, createApiStub, createTestQueryClient } from './helpers.jsx';
+import { createApiStub, createTestQueryClient } from './helpers.jsx';
 
 const MATERIAL_OPERATION = {
   id: 'op_1',
@@ -235,7 +235,6 @@ describe('task administration', () => {
 
   function mountTasks(routes = {}) {
     const stub = createApiStub({
-      '/auth/status': AUTH_STATUS,
       '/tasks': TASKS,
       '/projects': { projects: [] },
       ...routes

@@ -5,7 +5,7 @@ export const asyncHandler = (handler) => (req, res, next) => {
 
 /** Per-request context every mutation controller needs. */
 export const requestContext = (res, req) => ({
-  actor: res.locals.principal,
+  actor: null,
   requestId: res.locals.requestId,
   idempotencyKey: req.get('idempotency-key') || null
 });

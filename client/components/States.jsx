@@ -27,13 +27,7 @@ export function Empty({ title = 'Nothing here yet', description, action }) {
 }
 
 const ERROR_PRESENTATION = {
-  AUTH_REQUIRED: { title: 'Sign in required', hint: 'Your session has ended. Sign in again to continue.' },
-  INVALID_CREDENTIALS: { title: 'Sign in failed', hint: 'Check the email and password and try again.' },
-  AUTH_NOT_CONFIGURED: {
-    title: 'Owner sign-in is not configured',
-    hint: 'Set OWNER_EMAIL and OWNER_PASSWORD_HASH on the server, then restart it.'
-  },
-  FORBIDDEN: { title: 'Not permitted', hint: 'This action is restricted to the owner.' },
+  FORBIDDEN: { title: 'Not permitted', hint: 'This action is restricted by the current policy.' },
   PATH_NOT_ALLOWED: { title: 'Path not allowed', hint: 'This Vault path is outside the configured allowlist.' },
   OPERATION_NOT_ALLOWED: { title: 'Operation not allowed', hint: 'This operation is disabled by the current policy.' },
   APPROVAL_REQUIRED: { title: 'Approval required', hint: 'Approve this operation before executing it.' },
@@ -53,7 +47,7 @@ const ERROR_PRESENTATION = {
   },
   VAULT_WRITE_DISABLED: {
     title: 'Writes are disabled',
-    hint: 'Enable WRITE_OPERATIONS_ENABLED with owner authentication configured to allow changes.'
+    hint: 'Enable WRITE_OPERATIONS_ENABLED to allow changes.'
   },
   VAULT_FILE_NOT_FOUND: { title: 'Not found in the Vault', hint: 'The requested document does not exist.' },
   VAULT_FILE_EXISTS: { title: 'Already exists', hint: 'A file already exists at that path. Use replace instead.' },
@@ -65,7 +59,6 @@ const ERROR_PRESENTATION = {
   AI_UPSTREAM_ERROR: { title: 'The assistant is unavailable', hint: 'The reasoning provider did not respond. Try again.' },
   AI_TIMEOUT: { title: 'The assistant timed out', hint: 'The reasoning provider took too long. Try a narrower scope.' },
   RATE_LIMITED: { title: 'Too many requests', hint: 'Slow down for a moment and try again.' },
-  CSRF_TOKEN_INVALID: { title: 'Session check failed', hint: 'Reload the page and try again.' },
   NETWORK_ERROR: { title: 'Cannot reach the API', hint: 'Check that the Nexus API is running.' },
   NOT_FOUND: { title: 'Not found', hint: 'The requested record does not exist.' }
 };

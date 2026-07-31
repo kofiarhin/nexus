@@ -24,11 +24,6 @@ const ID_RULE = {
   patternMessage: 'must contain only letters, numbers, dots, dashes, or underscores'
 };
 
-export const loginSchema = {
-  email: { type: 'string', required: true, maxLength: 320, lowercase: true },
-  password: { type: 'string', required: true, maxLength: 512, trim: false }
-};
-
 export const taskCreateSchema = {
   name: { type: 'string', required: true, maxLength: 300 },
   status: { type: 'string', enum: TASK_STATUSES, default: 'todo' },

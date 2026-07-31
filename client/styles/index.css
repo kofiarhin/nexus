@@ -619,21 +619,3 @@ th { color: var(--muted); font-size: 0.82rem; text-transform: uppercase; letter-
 .dialog-header button { margin-left: auto; font-size: 1.2rem; }
 .dialog-body { padding: 1rem; overflow-y: auto; }
 .dialog-footer { border-top: 1px solid var(--border); justify-content: flex-end; }
-
-/* Auth ------------------------------------------------------------------- */
-
-.auth-screen {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-}
-
-.auth-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1.5rem;
-  width: min(400px, 100%);
-}

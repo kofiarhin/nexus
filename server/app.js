@@ -1,6 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import cookieParser from 'cookie-parser';
 
 import { loadEnv } from './config/env.js';
 import { GitHubClient } from './integrations/github/githubClient.js';
@@ -17,7 +16,6 @@ import {
   KnowledgeRepository
 } from './repositories/captureRepository.js';
 
-import { AuthService } from './services/authService.js';
 import { BusinessService, ProjectService } from './services/projectService.js';
 import { TaskService } from './services/taskService.js';
 import { AuditService } from './services/auditService.js';
@@ -31,7 +29,6 @@ import { DailyService, InboxService, KnowledgeService } from './services/capture
 import { ReportService } from './services/reportService.js';
 
 import { createHealthController } from './controllers/healthController.js';
-import { createAuthController } from './controllers/authController.js';
 import { createBusinessController, createProjectController } from './controllers/projectController.js';
 import { createPlanningController, createTaskController } from './controllers/taskController.js';
 import { createSearchController, createVaultController } from './controllers/vaultController.js';
@@ -48,7 +45,6 @@ import {
 
 import { createApiRouter } from './routes/index.js';
 import { requestId } from './middleware/requestId.js';
-import { attachPrincipal, csrfProtection, requireAuth } from './middleware/auth.js';
 import { createRateLimiter } from './middleware/rateLimit.js';
 import { notFound } from './middleware/notFound.js';
 import { createErrorHandler } from './middleware/errorHandler.js';
@@ -101,7 +97,6 @@ export function createApp({
   const dailyRepository = new DailyRepository({ vaultRepository });
   const knowledgeRepository = new KnowledgeRepository({ vaultRepository });
 
-  const authService = new AuthService({ env });
   const auditService = new AuditService({ store: stores.audit, logger, now });
   const operationService = new OperationService({
     env,
@@ -174,7 +169,6 @@ export function createApp({
 
   const controllers = {
     health: createHealthController({ githubClient, provider, env }),
-    auth: createAuthController({ authService, env, logger }),
     project: createProjectController({ projectService: new ProjectService(projectRepository) }),
     business: createBusinessController({ businessService: new BusinessService(businessRepository) }),
     task: createTaskController({ taskService }),
@@ -189,7 +183,7 @@ export function createApp({
     daily: createDailyController({ dailyService }),
     knowledge: createKnowledgeController({ knowledgeService }),
     report: createReportController({ reportService }),
-    settings: createSettingsController({ env, authService, provider, githubClient, operationService })
+    settings: createSettingsController({ env, provider, githubClient, operationService })
   };
 
   const app = express();
@@ -198,27 +192,14 @@ export function createApp({
   app.set('trust proxy', 1);
   // Runs first so preflight and parser-rejected requests still carry a request ID.
   app.use(requestId);
-  app.use(cors({ origin: env.clientUrl, credentials: true }));
-  app.use(cookieParser());
+  app.use(cors({ origin: env.clientUrl }));
   app.use(express.json({ limit: '2mb' }));
   app.use(createRateLimiter({ windowMs: env.rateLimitWindowMs, max: env.rateLimitMaxRequests }));
-  app.use(attachPrincipal({ authService }));
-  app.use(csrfProtection({ env }));
-
-  // With authentication disabled every request runs as the local owner, so the
-  // read and write guards collapse to the same check.
-  const requireRead = env.authEnabled ? requireAuth : (req, res, next) => next();
 
   app.use(
     '/api/v1',
     createApiRouter({
       controllers,
-      requireRead,
-      requireWrite: requireRead,
-      authRateLimiter: createRateLimiter({
-        windowMs: env.rateLimitWindowMs,
-        max: env.authRateLimitMaxRequests
-      }),
       aiRateLimiter: createRateLimiter({ windowMs: env.rateLimitWindowMs, max: 60 })
     })
   );
@@ -229,7 +210,6 @@ export function createApp({
     env,
     provider,
     services: {
-      authService,
       auditService,
       operationService,
       taskService,

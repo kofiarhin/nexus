@@ -17,13 +17,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "node scripts/lint.mjs",
-    "auth:hash": "node scripts/hash-password.mjs",
     "vault:bootstrap": "node scripts/bootstrap-vault.mjs",
     "verify": "npm run lint && npm test && npm run build:client"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.4",
-    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^5.2.1",

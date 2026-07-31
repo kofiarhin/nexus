@@ -140,7 +140,7 @@ export class ConversationService {
 
     for (const candidate of result.operations ?? []) {
       try {
-        // Model output is re-authorized and re-validated by the operation
+        // Model output is re-checked and re-validated by the operation
         // service exactly as a manual request would be.
         // eslint-disable-next-line no-await-in-loop
         const operation = await this.operationService.propose({

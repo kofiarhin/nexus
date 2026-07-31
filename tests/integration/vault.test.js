@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createTestApp, destructiveEnabled, signIn, writeEnabled } from '../helpers/testApp.js';
+import { createTestApp, destructiveEnabled, createPublicClient, writeEnabled } from '../helpers/testApp.js';
 
 /** Proposes a change, approves it, then executes it. */
 async function proposeApproveExecute(send, body, { confirmDestructive = false } = {}) {
@@ -15,7 +15,7 @@ async function proposeApproveExecute(send, body, { confirmDestructive = false } 
 describe('Vault reading', () => {
   it('returns the Vault tree with only readable documents', async () => {
     const { app } = createTestApp();
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const response = await agent.get('/api/v1/vault/tree');
 
@@ -27,7 +27,7 @@ describe('Vault reading', () => {
 
   it('reads a document with its revision and writability', async () => {
     const { app } = createTestApp({ environment: writeEnabled() });
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const response = await agent.get('/api/v1/vault/files?path=tasks/TASKS.md');
 
@@ -39,7 +39,7 @@ describe('Vault reading', () => {
 
   it('rejects a traversal path in a query parameter', async () => {
     const { app } = createTestApp();
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const response = await agent.get('/api/v1/vault/files?path=../../etc/passwd');
 
@@ -49,7 +49,7 @@ describe('Vault reading', () => {
 
   it('refuses to read outside the allowlist', async () => {
     const { app } = createTestApp({ environment: { VAULT_READ_PATHS: 'projects' } });
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const response = await agent.get('/api/v1/vault/files?path=tasks/TASKS.md');
 
@@ -59,7 +59,7 @@ describe('Vault reading', () => {
 
   it('returns Git history for a document', async () => {
     const { app } = createTestApp();
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const response = await agent.get('/api/v1/vault/files/history?path=tasks/TASKS.md');
 
@@ -69,7 +69,7 @@ describe('Vault reading', () => {
 
   it('runs a layered search without invoking any reasoning provider', async () => {
     const { app } = createTestApp();
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const response = await agent.get('/api/v1/search?q=quarterly');
 
@@ -81,7 +81,7 @@ describe('Vault reading', () => {
 
   it('resolves a registered project by name in the registry layer', async () => {
     const { app } = createTestApp();
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const response = await agent.get('/api/v1/search?q=nexus');
 
@@ -93,7 +93,7 @@ describe('Vault reading', () => {
 describe('Vault writes', () => {
   it('refuses every mutation while writes are disabled', async () => {
     const { app, vault } = createTestApp();
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     const response = await send('put', '/api/v1/vault/files').send({
       path: 'knowledge/retrieval.md',
@@ -107,7 +107,7 @@ describe('Vault writes', () => {
 
   it('creates a document through the approval pipeline', async () => {
     const { app, vault } = createTestApp({ environment: writeEnabled() });
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     const { executed } = await proposeApproveExecute(send, {
       action: 'create',
@@ -125,7 +125,7 @@ describe('Vault writes', () => {
 
   it('refuses to create over an existing document', async () => {
     const { app } = createTestApp({ environment: writeEnabled() });
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     const response = await send('post', '/api/v1/vault/files').send({
       path: 'knowledge/retrieval.md',
@@ -138,7 +138,7 @@ describe('Vault writes', () => {
 
   it('shows a diff on a replace proposal and writes nothing until executed', async () => {
     const { app, vault } = createTestApp({ environment: writeEnabled() });
-    const { agent, send } = await signIn(app);
+    const { agent, send } = await createPublicClient(app);
 
     const file = await agent.get('/api/v1/vault/files?path=knowledge/retrieval.md');
     const before = vault.read('knowledge/retrieval.md');
@@ -159,7 +159,7 @@ describe('Vault writes', () => {
 
   it('rejects a proposal without changing the Vault', async () => {
     const { app, vault } = createTestApp({ environment: writeEnabled() });
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     const before = vault.read('knowledge/retrieval.md');
     const proposal = await send('put', '/api/v1/vault/files').send({
@@ -176,7 +176,7 @@ describe('Vault writes', () => {
 
   it('returns a conflict when the document changed after the proposal', async () => {
     const { app, vault } = createTestApp({ environment: writeEnabled() });
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     const proposal = await send('put', '/api/v1/vault/files').send({
       path: 'knowledge/retrieval.md',
@@ -197,7 +197,7 @@ describe('Vault writes', () => {
 
   it('appends without duplicating content on retry', async () => {
     const { app, vault } = createTestApp({ environment: writeEnabled() });
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     const first = await send('post', '/api/v1/vault/files/append').send({
       path: 'inbox/INBOX.md',
@@ -219,7 +219,7 @@ describe('Vault writes', () => {
 
   it('moves a document after approval', async () => {
     const { app, vault } = createTestApp({ environment: writeEnabled() });
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     const { executed } = await proposeApproveExecute(send, {
       action: 'move',
@@ -234,7 +234,7 @@ describe('Vault writes', () => {
 
   it('archives a document to a dated archive path', async () => {
     const { app, vault } = createTestApp({ environment: writeEnabled() });
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     const { executed } = await proposeApproveExecute(send, {
       action: 'archive',
@@ -248,7 +248,7 @@ describe('Vault writes', () => {
 
   it('refuses a hard delete while destructive operations are disabled', async () => {
     const { app, vault } = createTestApp({ environment: writeEnabled() });
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     const response = await send('delete', '/api/v1/vault/files').send({ path: 'knowledge/retrieval.md' });
 
@@ -259,7 +259,7 @@ describe('Vault writes', () => {
 
   it('requires explicit confirmation for a hard delete', async () => {
     const { app, vault } = createTestApp({ environment: destructiveEnabled() });
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     const proposal = await send('delete', '/api/v1/vault/files').send({ path: 'knowledge/retrieval.md' });
     const { operation } = proposal.body.data;
@@ -283,7 +283,7 @@ describe('Vault writes', () => {
 
   it('restores a previous revision', async () => {
     const { app, vault } = createTestApp({ environment: writeEnabled() });
-    const { agent, send } = await signIn(app);
+    const { agent, send } = await createPublicClient(app);
 
     const original = vault.read('knowledge/retrieval.md');
     const file = await agent.get('/api/v1/vault/files?path=knowledge/retrieval.md');
@@ -316,7 +316,7 @@ describe('Vault writes', () => {
 describe('activity and audit', () => {
   it('records the full proposal-to-execution trail with Git evidence', async () => {
     const { app } = createTestApp({ environment: writeEnabled() });
-    const { agent, send } = await signIn(app);
+    const { agent, send } = await createPublicClient(app);
 
     const { operation, executed } = await proposeApproveExecute(send, {
       action: 'create',
@@ -336,14 +336,14 @@ describe('activity and audit', () => {
       risk: 'material',
       commit: executed.body.data.operation.result.commit
     });
-    expect(success.actor.email).toBe('owner@example.test');
-    expect(success.approval.approvedBy.email).toBe('owner@example.test');
+    expect(success.actor).toBeNull();
+    expect(success.approval.approvedBy).toBeNull();
     expect(success.requestId).toEqual(expect.any(String));
   });
 
   it('records a rejection and never leaks the Vault token', async () => {
     const { app } = createTestApp({ environment: writeEnabled() });
-    const { agent, send } = await signIn(app);
+    const { agent, send } = await createPublicClient(app);
 
     const proposal = await send('put', '/api/v1/vault/files').send({
       path: 'knowledge/retrieval.md',
@@ -358,7 +358,7 @@ describe('activity and audit', () => {
 
   it('returns the operation with its audit trail', async () => {
     const { app } = createTestApp({ environment: writeEnabled() });
-    const { agent, send } = await signIn(app);
+    const { agent, send } = await createPublicClient(app);
 
     const proposal = await send('post', '/api/v1/operations/proposals').send({
       action: 'replace',
@@ -374,7 +374,7 @@ describe('activity and audit', () => {
 
   it('reports an unknown operation as not found', async () => {
     const { app } = createTestApp({ environment: writeEnabled() });
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
 
     const response = await agent.get('/api/v1/operations/op_does_not_exist');
     expect(response.status).toBe(404);

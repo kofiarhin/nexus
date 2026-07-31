@@ -64,7 +64,7 @@ function matchesPrefix(path, prefix) {
 }
 
 /**
- * Server-side authorization for a normalized path.
+ * Server-side path policy for a normalized path.
  * Read and write allowlists are configured separately so a path can be
  * readable without being writable.
  */

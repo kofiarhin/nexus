@@ -159,7 +159,7 @@ export default function Today() {
 
       <Card title="Recent activity" actions={<Link to="/activity">View all</Link>}>
         {data.recentActivity.length === 0 ? (
-          <p className="muted">No operations have been recorded in this session.</p>
+          <p className="muted">No operations have been recorded in this server run.</p>
         ) : (
           <ul className="plain-list">
             {data.recentActivity.map((event) => (

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createTestApp, signIn, writeEnabled } from '../helpers/testApp.js';
+import { createTestApp, createPublicClient, writeEnabled } from '../helpers/testApp.js';
 import { NVIDIA_ENVIRONMENT, createFakeNvidia } from '../helpers/fakeNvidia.js';
 
 function createAiApp({ reply, environment = {} } = {}) {
@@ -19,7 +19,7 @@ const startConversation = async (send, scope = { type: 'vault', ids: [] }) => {
 describe('conversation without a reasoning provider', () => {
   it('reports that reasoning is not configured while reads keep working', async () => {
     const { app } = createTestApp({ environment: writeEnabled() });
-    const { agent, send } = await signIn(app);
+    const { agent, send } = await createPublicClient(app);
 
     const conversation = await startConversation(send);
     const response = await send('post', `/api/v1/conversations/${conversation.id}/messages`)
@@ -34,7 +34,7 @@ describe('conversation without a reasoning provider', () => {
 describe('conversation with a reasoning provider', () => {
   it('answers with citations mapped to a bounded source manifest', async () => {
     const { app } = createAiApp({ reply: 'Nexus is active [S1] and one task is open [S3].' });
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     const conversation = await startConversation(send);
     const response = await send('post', `/api/v1/conversations/${conversation.id}/messages`)
@@ -53,7 +53,7 @@ describe('conversation with a reasoning provider', () => {
 
   it('sends only bounded Vault context, never credentials', async () => {
     const { app, nvidia } = createAiApp();
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     const conversation = await startConversation(send);
     await send('post', `/api/v1/conversations/${conversation.id}/messages`).send({ content: 'Summarise the Vault' });
@@ -62,13 +62,11 @@ describe('conversation with a reasoning provider', () => {
     expect(prompt).toContain('registry/PROJECTS.md');
     expect(prompt).not.toContain('test-token-value');
     expect(prompt).not.toContain('test-nvidia-key');
-    expect(prompt).not.toContain('test-session-secret');
-    expect(prompt).not.toContain('nexus_session');
   });
 
   it('scopes context to a single project', async () => {
     const { app, nvidia } = createAiApp();
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     const conversation = await startConversation(send, { type: 'project', ids: ['nexus'] });
     const response = await send('post', `/api/v1/conversations/${conversation.id}/messages`)
@@ -82,7 +80,7 @@ describe('conversation with a reasoning provider', () => {
 
   it('scopes context to explicitly selected documents', async () => {
     const { app } = createAiApp();
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     const conversation = await startConversation(send, { type: 'document', ids: ['knowledge/retrieval.md'] });
     const response = await send('post', `/api/v1/conversations/${conversation.id}/messages`)
@@ -93,7 +91,7 @@ describe('conversation with a reasoning provider', () => {
 
   it('refuses a document scope outside the read allowlist', async () => {
     const { app } = createAiApp();
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     const conversation = await startConversation(send, { type: 'document', ids: ['secrets/keys.md'] });
     const response = await send('post', `/api/v1/conversations/${conversation.id}/messages`)
@@ -105,7 +103,7 @@ describe('conversation with a reasoning provider', () => {
 
   it('keeps the transcript as working context, not durable memory', async () => {
     const { app, vault } = createAiApp();
-    const { agent, send } = await signIn(app);
+    const { agent, send } = await createPublicClient(app);
 
     const conversation = await startConversation(send);
     await send('post', `/api/v1/conversations/${conversation.id}/messages`)
@@ -118,7 +116,7 @@ describe('conversation with a reasoning provider', () => {
 
   it('surfaces an upstream provider failure safely', async () => {
     const { app, nvidia } = createAiApp();
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
     const conversation = await startConversation(send);
 
     nvidia.mode = 'upstream-error';
@@ -132,7 +130,7 @@ describe('conversation with a reasoning provider', () => {
 
   it('reports a provider timeout distinctly', async () => {
     const { app, nvidia } = createAiApp();
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
     const conversation = await startConversation(send);
 
     nvidia.mode = 'timeout';
@@ -145,7 +143,7 @@ describe('conversation with a reasoning provider', () => {
 
   it('validates the message payload', async () => {
     const { app } = createAiApp();
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
     const conversation = await startConversation(send);
 
     const response = await send('post', `/api/v1/conversations/${conversation.id}/messages`).send({ content: '' });
@@ -155,13 +153,13 @@ describe('conversation with a reasoning provider', () => {
 
   it('reports an unknown conversation as not found', async () => {
     const { app } = createAiApp();
-    const { agent } = await signIn(app);
+    const { agent } = await createPublicClient(app);
     expect((await agent.get('/api/v1/conversations/cnv_missing')).status).toBe(404);
   });
 
   it('streams a reply as Server-Sent Events', async () => {
     const { app } = createAiApp({ reply: 'A streamed answer [S1].' });
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
     const conversation = await startConversation(send);
 
     const response = await send('post', `/api/v1/conversations/${conversation.id}/messages`)
@@ -197,7 +195,7 @@ describe('conversational operation proposals', () => {
 
   it('creates a reviewable proposal and writes nothing', async () => {
     const { app, vault } = createAiApp({ reply: proposalReply });
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
     const conversation = await startConversation(send);
 
     const response = await send('post', `/api/v1/conversations/${conversation.id}/messages`)
@@ -216,7 +214,7 @@ describe('conversational operation proposals', () => {
 
   it('applies a conversational proposal only after approval and execution', async () => {
     const { app, vault } = createAiApp({ reply: proposalReply });
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
     const conversation = await startConversation(send);
 
     const message = await send('post', `/api/v1/conversations/${conversation.id}/messages`)
@@ -238,7 +236,7 @@ describe('conversational operation proposals', () => {
         operations: [{ action: 'replace', path: 'NEXUS.md', content: 'overwritten' }]
       })
     });
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
     const conversation = await startConversation(send);
 
     const response = await send('post', `/api/v1/conversations/${conversation.id}/messages`)
@@ -256,7 +254,7 @@ describe('conversational operation proposals', () => {
         operations: [{ action: 'delete', path: 'knowledge/retrieval.md' }]
       })
     });
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
     const conversation = await startConversation(send);
 
     const response = await send('post', `/api/v1/conversations/${conversation.id}/messages`)
@@ -272,7 +270,7 @@ describe('conversational operation proposals', () => {
       environment: NVIDIA_ENVIRONMENT,
       aiFetchImpl: nvidia.fetchImpl
     });
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
     const conversation = await startConversation(send);
 
     const response = await send('post', `/api/v1/conversations/${conversation.id}/messages`)
@@ -286,7 +284,7 @@ describe('conversational operation proposals', () => {
 describe('planning with a reasoning provider', () => {
   it('adds a labelled narrative on top of the deterministic plan', async () => {
     const { app } = createAiApp({ reply: 'Start with the overdue item [S1].' });
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     const response = await send('post', '/api/v1/planning/today/proposals').send({ goal: 'Plan today' });
 
@@ -298,7 +296,7 @@ describe('planning with a reasoning provider', () => {
 
   it('returns the deterministic plan when the provider fails', async () => {
     const { app, nvidia } = createAiApp();
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     nvidia.mode = 'upstream-error';
     const response = await send('post', '/api/v1/planning/today/proposals').send({ goal: 'Plan today' });
@@ -311,7 +309,7 @@ describe('planning with a reasoning provider', () => {
 describe('memory proposals', () => {
   it('proposes a memory without writing it, flagging conflicts', async () => {
     const { app, vault } = createAiApp();
-    const { agent, send } = await signIn(app);
+    const { agent, send } = await createPublicClient(app);
 
     const response = await send('post', '/api/v1/memory/proposals').send({
       statement: 'Kofi prefers concise summaries in every report',
@@ -332,7 +330,7 @@ describe('memory proposals', () => {
 
   it('writes the memory only after approval, through the operation pipeline', async () => {
     const { app, vault } = createAiApp();
-    const { agent, send } = await signIn(app);
+    const { agent, send } = await createPublicClient(app);
 
     const proposed = await send('post', '/api/v1/memory/proposals').send({
       statement: 'Invoices are issued on the first working day of the month',
@@ -351,7 +349,7 @@ describe('memory proposals', () => {
 
   it('rejects a proposal without writing anything', async () => {
     const { app, vault } = createAiApp();
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     const before = vault.read('memory/MEMORY.md');
     const proposed = await send('post', '/api/v1/memory/proposals').send({ statement: 'Something unwanted' });
@@ -364,7 +362,7 @@ describe('memory proposals', () => {
 
   it('corrects a stored memory in place', async () => {
     const { app, vault } = createAiApp();
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     const response = await send('patch', '/api/v1/memory/mem-style')
       .send({ statement: 'Kofi prefers concise written summaries' });
@@ -376,7 +374,7 @@ describe('memory proposals', () => {
 
   it('forgets a memory record', async () => {
     const { app, vault } = createAiApp();
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
 
     const response = await send('delete', '/api/v1/memory/mem-style').send({});
 
@@ -387,7 +385,7 @@ describe('memory proposals', () => {
 
   it('reports an unknown memory record as not found', async () => {
     const { app } = createAiApp();
-    const { send } = await signIn(app);
+    const { send } = await createPublicClient(app);
     expect((await send('delete', '/api/v1/memory/mem-missing').send({})).status).toBe(404);
   });
 });
