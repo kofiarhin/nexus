@@ -1,15 +1,19 @@
-import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../server/app.js';
 
+// These cases cover Vault error normalization and the response envelope.
 const environment = {
   PORT: '5000',
   CLIENT_URL: 'http://localhost:5173',
+  LOG_ENABLED: 'false',
   GITHUB_TOKEN: 'token',
   GITHUB_OWNER: 'kofiarhin',
   GITHUB_VAULT_REPO: 'nexus-vault',
   GITHUB_VAULT_BRANCH: 'main'
 };
+
+const unconfiguredEnvironment = { PORT: '5000', LOG_ENABLED: 'false' };
 
 const projectRegistry = '| Project | Summary |\n| --- | --- |\n| [Alpha](projects/alpha.md) | First project |';
 
@@ -74,20 +78,24 @@ describe('Nexus API', () => {
     expect(response.body.data).toEqual({
       status: 'configured',
       repository: 'kofiarhin/nexus-vault',
-      branch: 'main'
+      branch: 'main',
+      writeOperationsEnabled: false,
+      destructiveOperationsEnabled: false
     });
     expect(JSON.stringify(response.body)).not.toContain(environment.GITHUB_TOKEN);
   });
 
   it('reports unconfigured Vault health without claiming connectivity', async () => {
-    const response = await request(createApp({ environment: { PORT: '5000' } }))
+    const response = await request(createApp({ environment: unconfiguredEnvironment }))
       .get('/api/v1/health/vault');
 
     expect(response.status).toBe(200);
     expect(response.body.data).toEqual({
       status: 'not_configured',
       repository: null,
-      branch: 'main'
+      branch: 'main',
+      writeOperationsEnabled: false,
+      destructiveOperationsEnabled: false
     });
   });
 
@@ -210,7 +218,7 @@ describe('Nexus API', () => {
   });
 
   it('returns a controlled error when the Vault is not configured', async () => {
-    const response = await request(createApp({ environment: { PORT: '5000' } })).get('/api/v1/projects');
+    const response = await request(createApp({ environment: unconfiguredEnvironment })).get('/api/v1/projects');
 
     expect(response.status).toBe(503);
     expect(response.body.error).toEqual({
