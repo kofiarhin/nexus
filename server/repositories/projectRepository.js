@@ -1,3 +1,12 @@
+import { VAULT_PATHS } from '../config/policy.js';
+import {
+  extractTitle,
+  findSection,
+  parseFrontMatter,
+  parseListItems,
+  parseSections
+} from '../utils/markdown.js';
+
 const LINKED_CELL_PATTERN = /^\[([^\]]+)\]\(([^)]+)\)$/;
 const PROJECT_PATH_PATTERN = /^[^\s|]+\.md$/i;
 const SEPARATOR_ROW_PATTERN = /^[\s|:-]+$/;
@@ -18,13 +27,13 @@ function slugFromPath(path) {
   return segments[segments.length - 1] ?? '';
 }
 
-function buildProject({ id, name, path, summary }) {
+function buildProject({ id, name, path, summary, status = '', updatedAt = '' }) {
   if (!PROJECT_PATH_PATTERN.test(path)) return null;
 
   const slug = id || slugFromPath(path);
   if (!slug) return null;
 
-  return { name: name || slug, slug, path, summary };
+  return { name: name || slug, slug, path, summary, status, updatedAt };
 }
 
 // Legacy format: | [Nexus](projects/nexus/INDEX.md) | AI-native productivity system |
@@ -57,11 +66,14 @@ function parseStructuredRow(cells) {
     id: isFullRow ? cells[0] : '',
     name,
     path: cells[pathIndex],
-    summary: status ? `Status: ${status}` : ''
+    summary: status ? `Status: ${status}` : '',
+    status,
+    updatedAt: cells[pathIndex + 1] ?? ''
   });
 }
 
-function parseProjects(markdown) {
+/** Registry rows with their status and updated columns retained. */
+function parseProjectRows(markdown) {
   return (markdown ?? '')
     .split('\n')
     .filter((line) => line.trim().startsWith('|') && !SEPARATOR_ROW_PATTERN.test(line))
@@ -73,15 +85,108 @@ function parseProjects(markdown) {
     .filter(Boolean);
 }
 
+/**
+ * The registry projection used by `GET /projects`. Kept to its original four
+ * fields so existing Vault consumers and clients are unaffected.
+ */
+function parseProjects(markdown) {
+  return parseProjectRows(markdown).map(({ name, slug, path, summary }) => ({
+    name,
+    slug,
+    path,
+    summary
+  }));
+}
+
 export class ProjectRepository {
-  constructor(githubClient) {
-    this.githubClient = githubClient;
+  constructor({ vaultRepository }) {
+    this.vaultRepository = vaultRepository;
   }
 
   async list() {
-    const markdown = await this.githubClient.readText('registry/PROJECTS.md');
-    return parseProjects(markdown);
+    const file = await this.vaultRepository.readText(VAULT_PATHS.projectRegistry);
+    return parseProjects(file.content);
+  }
+
+  async listDetailed() {
+    const file = await this.vaultRepository.readText(VAULT_PATHS.projectRegistry);
+    return {
+      revision: file.revision,
+      sourcePath: file.path,
+      projects: parseProjectRows(file.content)
+    };
+  }
+
+  async findEntry(projectId) {
+    const { projects, sourcePath, revision } = await this.listDetailed();
+    const entry = projects.find((project) => project.slug === projectId);
+    return entry ? { entry, sourcePath, revision } : { entry: null, sourcePath, revision };
+  }
+
+  /**
+   * Full project record: registry row plus the project document's front matter
+   * and named sections. A missing document still yields the registry data.
+   */
+  async get(projectId) {
+    const { entry, sourcePath, revision } = await this.findEntry(projectId);
+    if (!entry) return null;
+
+    const document = await this.vaultRepository.readTextIfExists(entry.path);
+    const sources = [
+      { path: sourcePath, sha: revision, title: 'Project registry', reason: 'Registry entry for this project' }
+    ];
+
+    if (!document) {
+      return {
+        id: entry.slug,
+        name: entry.name,
+        lifecycle: entry.status || 'unknown',
+        summary: entry.summary,
+        path: entry.path,
+        documentMissing: true,
+        currentState: '',
+        currentFocus: '',
+        roadmap: [],
+        decisions: [],
+        assumptions: [],
+        openQuestions: [],
+        sections: [],
+        updatedAt: entry.updatedAt || null,
+        revision: null,
+        sources
+      };
+    }
+
+    const { data, body } = parseFrontMatter(document.content);
+    const sections = parseSections(body);
+
+    sources.push({
+      path: document.path,
+      sha: document.revision,
+      title: extractTitle(body) ?? entry.name,
+      reason: 'Project document'
+    });
+
+    return {
+      id: entry.slug,
+      name: data.name ?? extractTitle(body) ?? entry.name,
+      lifecycle: data.lifecycle ?? data.status ?? entry.status ?? 'unknown',
+      summary: entry.summary,
+      path: document.path,
+      documentMissing: false,
+      currentState: findSection(sections, 'current state', 'state', 'snapshot'),
+      currentFocus: findSection(sections, 'current focus', 'focus'),
+      roadmap: parseListItems(findSection(sections, 'roadmap', 'milestones')),
+      decisions: parseListItems(findSection(sections, 'decisions')),
+      assumptions: parseListItems(findSection(sections, 'assumptions')),
+      openQuestions: parseListItems(findSection(sections, 'open questions', 'questions')),
+      documents: parseListItems(findSection(sections, 'documents')),
+      sections: sections.map(({ heading, level, body: sectionBody }) => ({ heading, level, body: sectionBody })),
+      updatedAt: data.updatedAt ?? entry.updatedAt ?? null,
+      revision: document.revision,
+      sources
+    };
   }
 }
 
-export { parseProjects };
+export { parseProjects, parseProjectRows };
