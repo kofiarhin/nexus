@@ -1,58 +1,115 @@
-import React, { useEffect, useState } from 'react';
-import { resolveProjectsState } from './lib/projectsState.js';
+import React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Router, Routes, useLocation, useNavigate } from './lib/router.jsx';
+import { Layout } from './components/Layout.jsx';
+import { Empty, ErrorState, Loading } from './components/States.jsx';
+import { useAuthStatus } from './lib/queries.js';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000/api/v1';
+import Today from './pages/Today.jsx';
+import Chat from './pages/Chat.jsx';
+import { Businesses, BusinessDetail } from './pages/Businesses.jsx';
+import { Projects, ProjectDetail } from './pages/Projects.jsx';
+import Tasks from './pages/Tasks.jsx';
+import Inbox from './pages/Inbox.jsx';
+import Documents from './pages/Documents.jsx';
+import Knowledge from './pages/Knowledge.jsx';
+import Memory from './pages/Memory.jsx';
+import Daily from './pages/Daily.jsx';
+import Reports from './pages/Reports.jsx';
+import Activity from './pages/Activity.jsx';
+import Settings from './pages/Settings.jsx';
+import Login from './pages/Login.jsx';
 
-const EMPTY_MESSAGE = {
-  'missing-registry': 'The Vault is connected, but it has no registry/PROJECTS.md yet. Add that file to list projects.',
-  'no-projects': 'No projects are registered yet. Add a row to registry/PROJECTS.md to list one.'
-};
+const ROUTES = [
+  { path: '/today', element: Today },
+  { path: '/chat', element: Chat },
+  { path: '/businesses', element: Businesses },
+  { path: '/businesses/:businessId', element: BusinessDetail },
+  { path: '/projects', element: Projects },
+  { path: '/projects/:projectId', element: ProjectDetail },
+  { path: '/tasks', element: Tasks },
+  { path: '/inbox', element: Inbox },
+  { path: '/documents', element: Documents },
+  { path: '/documents/*', element: Documents },
+  { path: '/knowledge', element: Knowledge },
+  { path: '/memory', element: Memory },
+  { path: '/daily', element: Daily },
+  { path: '/reports', element: Reports },
+  { path: '/activity', element: Activity },
+  { path: '/settings', element: Settings }
+];
 
-export default function App() {
-  const [{ status, projects, reason }, setState] = useState({ status: 'loading', projects: [] });
-
-  useEffect(() => {
-    let active = true;
-
-    fetch(`${API_BASE_URL}/projects`)
-      .then(async (response) => ({ ok: response.ok, payload: await response.json() }))
-      .then((result) => {
-        if (active) setState(resolveProjectsState(result));
-      })
-      .catch(() => {
-        if (active) setState({ status: 'error', projects: [] });
-      });
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
+function NotFound() {
   return (
-    <main className="shell">
-      <header>
-        <p className="eyebrow">Nexus Foundation MVP</p>
-        <h1>Your knowledge, portable and project-aware.</h1>
-        <p>Nexus reads canonical Markdown from GitHub and keeps deterministic retrieval separate from AI reasoning.</p>
-      </header>
-      <section>
-        <h2>Vault projects</h2>
-        {status === 'loading' && <p>Loading projects…</p>}
-        {status === 'unconfigured' && <p>The Vault is not configured yet. Add GitHub environment variables to connect it.</p>}
-        {status === 'empty' && <p>{EMPTY_MESSAGE[reason] ?? EMPTY_MESSAGE['no-projects']}</p>}
-        {status === 'upstream-error' && <p>The Vault is temporarily unavailable. Try again shortly.</p>}
-        {status === 'error' && <p>Projects could not be loaded. Check that the API is running and try again.</p>}
-        {status === 'ready' && (
-          <ul>
-            {projects.map((project) => (
-              <li key={project.slug}>
-                <strong>{project.name}</strong>
-                <span>{project.summary || 'No summary documented'}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </main>
+    <Empty
+      title="Page not found"
+      description="That route does not exist in the Nexus command center."
+    />
   );
 }
+
+/**
+ * Authentication gate.
+ *
+ * The sign-in screen renders instead of the workspace whenever authentication
+ * is enabled and no session is active, so no private view is ever painted for
+ * an unauthenticated request.
+ */
+function Workspace() {
+  const status = useAuthStatus();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  React.useEffect(() => {
+    if (location.pathname === '/' || location.pathname === '') navigate('/today', { replace: true });
+  }, [location.pathname, navigate]);
+
+  if (status.isPending) return <Loading label="Starting Nexus…" />;
+  if (status.isError) {
+    return (
+      <main className="auth-screen">
+        <div className="auth-card">
+          <h1>Nexus</h1>
+          <ErrorState error={status.error} onRetry={status.refetch} />
+        </div>
+      </main>
+    );
+  }
+
+  const requiresLogin = status.data.authEnabled && !status.data.authenticated;
+  if (requiresLogin) return <Login authStatus={status.data} />;
+
+  return (
+    <Layout>
+      <Routes routes={ROUTES} fallback={<NotFound />} />
+    </Layout>
+  );
+}
+
+export function createQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: (failureCount, error) => {
+          // Authorization, validation, and conflict failures are not transient.
+          if (error?.code && error.code !== 'NETWORK_ERROR') return false;
+          return failureCount < 2;
+        },
+        refetchOnWindowFocus: false,
+        staleTime: 10_000
+      }
+    }
+  });
+}
+
+export default function App({ queryClient = createQueryClient(), initialPath }) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <Router initialPath={initialPath}>
+        <Workspace />
+      </Router>
+    </QueryClientProvider>
+  );
+}
+
+export { ROUTES };
