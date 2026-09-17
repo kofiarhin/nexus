@@ -40,8 +40,9 @@ jobs:
           additional_permissions: |
             actions: read
 
-          # Allow the delivery loop to run repository checks and create/update draft PRs
-          # without an interactive approval. Merge is intentionally not allowlisted.
+          # Allow the delivery loop to run repository checks, create/update normal PRs,
+          # and post the final source-issue completion notification without interactive approval.
+          # Merge is intentionally not allowlisted.
           claude_args: >-
             --allowed-tools
             "Bash(npm:*)"
@@ -50,3 +51,4 @@ jobs:
             "Bash(gh pr view:*)"
             "Bash(gh pr checks:*)"
             "Bash(gh pr edit:*)"
+            "Bash(gh issue comment:*)"
