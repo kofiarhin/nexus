@@ -43,4 +43,10 @@ jobs:
           # Allow the delivery loop to run repository checks and create/update draft PRs
           # without an interactive approval. Merge is intentionally not allowlisted.
           claude_args: >-
-            --allowed-tools Bash(npm:*),Bash(node:*),Bash(gh pr create:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(gh pr edit:*)
+            --allowed-tools
+            "Bash(npm:*)"
+            "Bash(node:*)"
+            "Bash(gh pr create:*)"
+            "Bash(gh pr view:*)"
+            "Bash(gh pr checks:*)"
+            "Bash(gh pr edit:*)"
