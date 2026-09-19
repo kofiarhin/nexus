@@ -1,24 +1,27 @@
-export function createHealthController({ githubClient }) {
+import { ok } from '../utils/respond.js';
+
+export function createHealthController({ githubClient, provider, env }) {
   return {
     health(req, res) {
-      return res.status(200).json({
-        success: true,
-        data: { status: 'ok', service: 'nexus-api' },
-        requestId: res.locals.requestId
+      return ok(res, { status: 'ok', service: 'nexus-api' });
+    },
+
+    /** Reports configuration only; it does not probe remote connectivity. */
+    vault(req, res) {
+      return ok(res, {
+        status: githubClient.isConfigured() ? 'configured' : 'not_configured',
+        repository: githubClient.repositoryName,
+        branch: githubClient.branch,
+        writeOperationsEnabled: env.writeOperationsEnabled,
+        destructiveOperationsEnabled: env.destructiveOperationsEnabled
       });
     },
 
-    vault(req, res) {
-      return res.status(200).json({
-        success: true,
-        data: {
-          status: githubClient.isConfigured() ? 'configured' : 'not_configured',
-          repository: githubClient.owner && githubClient.repo
-            ? `${githubClient.owner}/${githubClient.repo}`
-            : null,
-          branch: githubClient.branch
-        },
-        requestId: res.locals.requestId
+    ai(req, res) {
+      return ok(res, {
+        status: provider.isConfigured() ? 'configured' : 'not_configured',
+        provider: env.aiProvider,
+        model: provider.isConfigured() ? provider.model : null
       });
     }
   };

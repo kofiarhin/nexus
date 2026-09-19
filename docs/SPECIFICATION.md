@@ -19,7 +19,7 @@ User
 React/Vite client
   ↓
 Express API
-  ├─ Authentication and authorization
+  ├─ MVP access and operation policy
   ├─ Deterministic retrieval and search
   ├─ Domain services and validation
   ├─ Operation proposal and approval workflow
@@ -105,7 +105,7 @@ Controllers translate HTTP requests and responses. Services own business workflo
 
 ## 5. Client Architecture
 
-The client is an authenticated administrative application with persistent navigation and an optional assistant panel.
+The client is an MVP administrative application with persistent navigation and an optional assistant panel.
 
 ### Primary routes
 
@@ -142,7 +142,7 @@ The client is an authenticated administrative application with persistent naviga
 - **Daily:** plans, notes, events, outcomes, and reflections.
 - **Reports:** daily, weekly, business, project, and activity reports.
 - **Activity:** proposals, approvals, mutations, commits, failures, and rollbacks.
-- **Settings:** authentication, Vault, NVIDIA, approvals, permissions, and privacy.
+- **Settings:** Vault, NVIDIA, approvals, operation policy, and privacy.
 
 The client must show loading, empty, permission, conflict, validation, upstream, and retry states distinctly.
 
@@ -163,15 +163,13 @@ AI_PROVIDER=nvidia
 NVIDIA_API_KEY=
 NVIDIA_MODEL=
 
-AUTH_ENABLED=true
-SESSION_SECRET=
 WRITE_OPERATIONS_ENABLED=false
 DESTRUCTIVE_OPERATIONS_ENABLED=false
 ```
 
 Only `VITE_` variables may be exposed to the client. Secrets must never be returned, logged, committed, or included in model context.
 
-Write and destructive operations default to disabled unless authentication and required controls are configured.
+Write and destructive operations default to disabled unless the required operation controls are configured.
 
 ## 7. Standard Response Contract
 
@@ -203,20 +201,22 @@ Failure:
 
 Every response includes `x-request-id`. A supplied valid request ID is preserved; otherwise the server generates one.
 
-## 8. Authentication And Authorization
+## 8. MVP Access Policy
 
-Authentication is mandatory before mutation APIs are enabled in any reachable environment.
+Authentication is deferred for the MVP. All API endpoints are public to any client that can reach the
+server.
 
-The initial authorization model is owner-only:
+The MVP server-side policy is operation-focused:
 
-- authenticated owner may read permitted Vault paths;
-- authenticated owner may create operation proposals;
+- clients may read permitted Vault paths;
+- clients may create operation proposals when writes are enabled;
 - material and destructive writes require explicit approval;
-- unauthenticated requests cannot read private operational content or perform mutations.
+- writes and destructive operations stay behind explicit feature flags.
 
 Future multi-user roles require a separate approved permission model.
 
-Server-side authorization must evaluate the authenticated principal, action, path, entity type, feature flags, and destructive-operation policy. NVIDIA cannot grant authority.
+Server-side policy must evaluate the action, path, entity type, feature flags, and destructive-operation
+policy. NVIDIA cannot grant authority.
 
 ## 9. Vault Repository Interface
 
@@ -292,7 +292,7 @@ generateSummary(content, contextManifest, options)
 proposeOperations(instruction, contextManifest, allowedOperations)
 ```
 
-The adapter receives only bounded context and safe metadata. It must not receive GitHub credentials, session secrets, authorization headers, or unrelated Vault content.
+The adapter receives only bounded context and safe metadata. It must not receive GitHub credentials or unrelated Vault content.
 
 The model may return:
 
@@ -376,20 +376,19 @@ An operation proposal is not execution evidence.
 
 Every mutation follows this sequence:
 
-1. authenticate the user;
-2. authorize the action and path;
-3. resolve the canonical target;
-4. read the current content and revision;
-5. validate the requested entity and schema;
-6. calculate the proposed content and diff;
-7. classify risk;
-8. require approval when policy demands it;
-9. re-read the target immediately before writing;
-10. apply with the expected revision;
-11. confirm the GitHub response;
-12. verify by readback;
-13. record the commit and audit event;
-14. return the verified result.
+1. check the action and path policy;
+2. resolve the canonical target;
+3. read the current content and revision;
+4. validate the requested entity and schema;
+5. calculate the proposed content and diff;
+6. classify risk;
+7. require approval when policy demands it;
+8. re-read the target immediately before writing;
+9. apply with the expected revision;
+10. confirm the GitHub response;
+11. verify by readback;
+12. record the commit and audit event;
+13. return the verified result.
 
 Create operations must reject existing paths unless an explicit replace operation is authorized.
 
@@ -539,7 +538,6 @@ Approval and execution may be combined for low-risk manual operations only when 
 Expected codes include:
 
 ```text
-AUTH_REQUIRED
 FORBIDDEN
 VALIDATION_ERROR
 PATH_NOT_ALLOWED
@@ -565,7 +563,7 @@ Errors expose safe messages and structured details without upstream secrets or r
 Every proposal and mutation records:
 
 - request ID;
-- authenticated actor;
+- actor when available;
 - operation ID;
 - action and risk level;
 - source and destination paths;
@@ -583,8 +581,7 @@ Audit records do not replace Git or canonical Vault content. They provide operat
 - The Vault must be private before confidential content is stored.
 - GitHub tokens use the minimum repository permissions required.
 - NVIDIA credentials remain server-side.
-- Session cookies use secure production settings.
-- State-changing requests use CSRF or equivalent same-origin protection.
+- Authentication is not implemented in the MVP; do not expose the API beyond trusted local/private networks.
 - Routes use rate limits and payload-size limits.
 - Paths are normalized and restricted to allowlisted Vault areas.
 - Markdown rendering sanitizes unsafe HTML and links.
@@ -608,7 +605,7 @@ Audit records do not replace Git or canonical Vault content. They provide operat
 
 ### Integration tests
 
-- authenticated read and mutation routes;
+- public read and mutation routes;
 - GitHub read, create, replace, append, archive, delete, and restore adapters with mocks;
 - NVIDIA adapter with deterministic fixtures;
 - proposal-to-approval-to-readback workflow;
@@ -637,9 +634,9 @@ The server records safe structured events for:
 - NVIDIA request outcome and token or size metadata where safely available;
 - proposal, approval, execution, conflict, and rollback transitions;
 - GitHub upstream outcomes;
-- validation and authorization failures.
+- validation and policy failures.
 
-Logs must not contain credentials, full private documents, raw prompts containing sensitive content, or session values.
+Logs must not contain credentials, full private documents, or raw prompts containing sensitive content.
 
 ## 24. Deployment
 
@@ -653,7 +650,7 @@ The target deployment preserves the existing split:
 Production readiness requires:
 
 - private Vault configuration;
-- authentication and secure sessions;
+- authentication before public production exposure;
 - protected secrets;
 - HTTPS;
 - CORS and origin restrictions;
@@ -682,7 +679,7 @@ Production readiness requires:
 
 ### Milestone C — Controlled CRUD
 
-- owner authentication;
+- authentication deferred beyond the MVP;
 - private Vault readiness;
 - manual CRUD;
 - revision conflicts;
